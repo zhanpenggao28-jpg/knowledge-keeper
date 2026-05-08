@@ -1,0 +1,5 @@
+# AI 相关依赖（较大，按需安装）
+paddleocr>=2.9.0
+faster-whisper>=1.0.0
+openai-whisper>=20240930
+ollama>=0.4.0

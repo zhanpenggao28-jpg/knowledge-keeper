@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+data/
+__pycache__/
+*.pyc
+.env
+.venv/
+*.egg-info/
+.claude/
