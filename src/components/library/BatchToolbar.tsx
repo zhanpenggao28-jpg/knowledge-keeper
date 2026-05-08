@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Button, Space, Typography, App } from 'antd'
-import { DeleteOutlined, ExportOutlined, CloseOutlined, SelectOutlined } from '@ant-design/icons'
+import { DeleteOutlined, ExportOutlined, CloseOutlined, SelectOutlined, TagsOutlined } from '@ant-design/icons'
 import { useAppStore } from '../../stores/appStore'
-import { deleteItem } from '../../services/api'
+import { deleteItem, updateItem } from '../../services/api'
+import TagManager from '../tags/TagManager'
 
 const { Text } = Typography
 
@@ -12,6 +14,7 @@ interface Props {
 export default function BatchToolbar({ onRefresh }: Props) {
   const { selectedIds, clearSelection, selectAll, items } = useAppStore()
   const { message, modal } = App.useApp()
+  const [tagOpen, setTagOpen] = useState(false)
 
   const count = selectedIds.size
   if (count === 0) return null
@@ -56,54 +59,89 @@ export default function BatchToolbar({ onRefresh }: Props) {
     selectAll(items.map(i => i.id))
   }
 
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: 24,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 1000,
-      background: '#2a2218',
-      border: '1px solid #826f42',
-      borderRadius: 12,
-      padding: '8px 20px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 16,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.5)'
-    }}>
-      <Text style={{ color: '#d4b65f', fontWeight: 600 }}>
-        已选 {count} 项
-      </Text>
+  const handleBatchTag = async (tag: { id: number }) => {
+    const ids = Array.from(selectedIds)
+    const selected = items.filter(i => ids.includes(i.id))
+    let done = 0
+    for (const item of selected) {
+      const currentIds = item.tags?.map(t => t.id) ?? []
+      const newIds = currentIds.includes(tag.id)
+        ? currentIds.filter(id => id !== tag.id)
+        : [...currentIds, tag.id]
+      try { await updateItem(item.id, { tag_ids: newIds }); done++ } catch { /* skip */ }
+    }
+    message.success(`已更新 ${done} 个文件`)
+    onRefresh()
+  }
 
-      <Space>
-        <Button size="small" icon={<SelectOutlined />} onClick={handleSelectAll}>
-          全选
-        </Button>
-        <Button
-          size="small"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={handleDelete}
-        >
-          删除
-        </Button>
-        <Button
-          size="small"
-          icon={<ExportOutlined />}
-          onClick={handleExport}
-          disabled={!window.electronAPI}
-        >
-          导出
-        </Button>
-        <Button
-          size="small"
-          icon={<CloseOutlined />}
-          onClick={clearSelection}
-        >
-          取消
-        </Button>
-      </Space>
-    </div>
+  // Compute which tags are common to ALL selected items
+  const selectedItems = items.filter(i => selectedIds.has(i.id))
+  const commonTagIds = selectedItems.length > 0
+    ? selectedItems[0].tags?.map(t => t.id).filter(tid =>
+        selectedItems.every(si => si.tags?.some(st => st.id === tid))
+      ) ?? []
+    : []
+
+  return (
+    <>
+      <div style={{
+        position: 'fixed',
+        bottom: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        background: '#2a2218',
+        border: '1px solid #826f42',
+        borderRadius: 12,
+        padding: '8px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.5)'
+      }}>
+        <Text style={{ color: '#d4b65f', fontWeight: 600 }}>
+          已选 {count} 项
+        </Text>
+
+        <Space>
+          <Button size="small" icon={<SelectOutlined />} onClick={handleSelectAll}>
+            全选
+          </Button>
+          <Button size="small" icon={<TagsOutlined />} onClick={() => setTagOpen(true)}>
+            标签
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={handleDelete}
+          >
+            删除
+          </Button>
+          <Button
+            size="small"
+            icon={<ExportOutlined />}
+            onClick={handleExport}
+            disabled={!window.electronAPI}
+          >
+            导出
+          </Button>
+          <Button
+            size="small"
+            icon={<CloseOutlined />}
+            onClick={clearSelection}
+          >
+            取消
+          </Button>
+        </Space>
+      </div>
+
+      <TagManager
+        open={tagOpen}
+        onClose={() => setTagOpen(false)}
+        onSelectTag={handleBatchTag}
+        selectedTagIds={commonTagIds}
+      />
+    </>
   )
 }

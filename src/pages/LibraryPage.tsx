@@ -17,7 +17,8 @@ export default function LibraryPage() {
   const { items, total, isLoading, refresh } = useItems()
   const { viewMode, selectItem, setPreviewOpen, selectedIds, clearSelection } = useAppStore()
   const [tagManagerOpen, setTagManagerOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<Item | null>(null)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingTagIds, setEditingTagIds] = useState<number[]>([])
   const [renameItem, setRenameItem] = useState<Item | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [renaming, setRenaming] = useState(false)
@@ -56,7 +57,8 @@ export default function LibraryPage() {
   }
 
   const handleEditTags = (item: Item) => {
-    setEditingItem(item)
+    setEditingItemId(item.id)
+    setEditingTagIds(item.tags?.map(t => t.id) ?? [])
     setTagManagerOpen(true)
   }
 
@@ -97,20 +99,17 @@ export default function LibraryPage() {
   }
 
   const handleSelectTag = async (tag: { id: number }) => {
-    if (editingItem) {
-      const currentTags = editingItem.tags?.map(t => t.id) ?? []
-      const newTags = currentTags.includes(tag.id)
-        ? currentTags.filter(id => id !== tag.id)
-        : [...currentTags, tag.id]
-      try {
-        await updateItem(editingItem.id, { tag_ids: newTags })
-        message.success('标签已更新')
-        refresh()
-        setTagManagerOpen(false)
-        setEditingItem(null)
-      } catch {
-        message.error('更新失败')
-      }
+    if (!editingItemId) return
+    const newIds = editingTagIds.includes(tag.id)
+      ? editingTagIds.filter(id => id !== tag.id)
+      : [...editingTagIds, tag.id]
+    setEditingTagIds(newIds)
+    try {
+      await updateItem(editingItemId, { tag_ids: newIds })
+      message.success('标签已更新')
+      refresh()
+    } catch {
+      message.error('更新失败')
     }
   }
 
@@ -164,8 +163,9 @@ export default function LibraryPage() {
 
       <TagManager
         open={tagManagerOpen}
-        onClose={() => { setTagManagerOpen(false); setEditingItem(null) }}
+        onClose={() => { setTagManagerOpen(false); setEditingItemId(null) }}
         onSelectTag={handleSelectTag}
+        selectedTagIds={editingTagIds}
       />
 
       <BatchToolbar onRefresh={refresh} />
