@@ -4,7 +4,6 @@ import { App as AntApp } from 'antd'
 import AppLayout from './components/layout/AppLayout'
 import HomePage from './pages/HomePage'
 import LibraryPage from './pages/LibraryPage'
-import SearchPage from './pages/SearchPage'
 import SettingsPage from './pages/SettingsPage'
 import { useSettingsStore } from './stores/settingsStore'
 import { setApiPort } from './services/api'
@@ -45,7 +44,6 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/library" element={<LibraryPage />} />
-            <Route path="/search" element={<SearchPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </AppLayout>

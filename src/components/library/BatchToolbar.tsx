@@ -71,6 +71,7 @@ export default function BatchToolbar({ onRefresh }: Props) {
       try { await updateItem(item.id, { tag_ids: newIds }); done++ } catch { /* skip */ }
     }
     message.success(`已更新 ${done} 个文件`)
+    useAppStore.getState().bumpTagRefresh()
     onRefresh()
   }
 

@@ -7,19 +7,21 @@ interface AppState {
   total: number
   selectedItem: Item | null
   selectedIds: Set<string>
-  searchQuery: string
   activeCategory: string | null
   activeTagId: number | null
+  activeSearchQuery: string
   isLoading: boolean
   viewMode: 'grid' | 'list'
   previewOpen: boolean
   refreshKey: number
+  tagRefreshKey: number
+  bumpTagRefresh: () => void
 
-  loadItems: (params?: { category?: string; tag_id?: number; offset?: number; limit?: number }) => Promise<void>
+  loadItems: (params?: { category?: string; tag_id?: number; q?: string; offset?: number; limit?: number }) => Promise<void>
   selectItem: (item: Item | null) => void
-  setSearchQuery: (q: string) => void
   setCategory: (category: string | null) => void
   setTagFilter: (tagId: number | null) => void
+  setActiveSearchQuery: (q: string) => void
   setViewMode: (mode: 'grid' | 'list') => void
   setPreviewOpen: (open: boolean) => void
   toggleSelect: (id: string) => void
@@ -32,13 +34,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   total: 0,
   selectedItem: null,
   selectedIds: new Set<string>(),
-  searchQuery: '',
   activeCategory: null,
   activeTagId: null,
+  activeSearchQuery: '',
   isLoading: false,
   viewMode: 'grid',
   previewOpen: false,
   refreshKey: 0,
+  tagRefreshKey: 0,
+  bumpTagRefresh: () => set({ tagRefreshKey: get().tagRefreshKey + 1 }),
 
   loadItems: async (params) => {
     set({ isLoading: true })
@@ -46,6 +50,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const p = {
         category: params?.category ?? get().activeCategory ?? undefined,
         tag_id: params?.tag_id ?? get().activeTagId ?? undefined,
+        q: params?.q ?? (get().activeSearchQuery || undefined),
         offset: params?.offset ?? 0,
         limit: params?.limit ?? 50
       }
@@ -59,15 +64,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   selectItem: (item) => set({ selectedItem: item }),
-  setSearchQuery: (q) => set({ searchQuery: q }),
   setCategory: (category) => {
     set({ activeCategory: category })
-    get().loadItems({ category: category ?? undefined })
+    get().loadItems()
   },
   setTagFilter: (tagId) => {
     set({ activeTagId: tagId })
-    get().loadItems({ tag_id: tagId ?? undefined })
+    get().loadItems()
   },
+  setActiveSearchQuery: (q) => set({ activeSearchQuery: q }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setPreviewOpen: (open) => set({ previewOpen: open }),
 

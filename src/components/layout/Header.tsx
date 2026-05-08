@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Button, Space } from 'antd'
 import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import SearchBar from '../search/SearchBar'
 import ImportDialog from '../library/ImportDialog'
 import { useAppStore } from '../../stores/appStore'
 
@@ -20,8 +19,6 @@ export default function Header() {
         gap: 16
       }}
     >
-      <SearchBar />
-
       <Space>
         <Button
           icon={<AppstoreOutlined />}

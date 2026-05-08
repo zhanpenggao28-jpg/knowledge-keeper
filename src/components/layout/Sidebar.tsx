@@ -3,7 +3,6 @@ import { Menu } from 'antd'
 import {
   HomeOutlined,
   FolderOpenOutlined,
-  SearchOutlined,
   SettingOutlined,
   TagOutlined
 } from '@ant-design/icons'
@@ -21,7 +20,6 @@ export default function Sidebar() {
   const menuItems = [
     { key: '/', icon: <HomeOutlined />, label: '首页' },
     { key: '/library', icon: <FolderOpenOutlined />, label: '文件库' },
-    { key: '/search', icon: <SearchOutlined />, label: '搜索' },
     { key: '/settings', icon: <SettingOutlined />, label: '设置' },
   ]
 

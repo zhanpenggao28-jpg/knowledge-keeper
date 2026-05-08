@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Card, Row, Col, Statistic, Typography, Space, Button } from 'antd'
-import { FileTextOutlined, PictureOutlined, VideoCameraOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { FileTextOutlined, PictureOutlined, VideoCameraOutlined, PlusOutlined } from '@ant-design/icons'
 import { useAppStore } from '../stores/appStore'
 import { useItems } from '../hooks/useItems'
 import ItemGrid from '../components/library/ItemGrid'
@@ -10,7 +9,6 @@ import ImportDialog from '../components/library/ImportDialog'
 const { Title } = Typography
 
 export default function HomePage() {
-  const navigate = useNavigate()
   const { items, refresh } = useItems()
   const { selectItem, setPreviewOpen } = useAppStore()
   const loadItems = useAppStore(s => s.loadItems)
@@ -58,7 +56,6 @@ export default function HomePage() {
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={5} style={{ margin: 0 }}>最近添加</Title>
         <Space>
-          <Button icon={<SearchOutlined />} onClick={() => navigate('/search')}>搜索</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setImportOpen(true)}>导入文件</Button>
         </Space>
       </div>

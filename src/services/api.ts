@@ -50,6 +50,7 @@ export async function getItems(params?: {
   category?: string
   status?: string
   tag_id?: number
+  q?: string
   offset?: number
   limit?: number
 }): Promise<{ items: Item[]; total: number }> {

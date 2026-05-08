@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Modal, Input, ColorPicker, List, Button, Space, Popconfirm, Empty, App } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import { useTags } from '../../hooks/useTags'
+import { useAppStore } from '../../stores/appStore'
 import type { Tag } from '../../types'
 
 interface Props {
@@ -31,6 +32,7 @@ export default function TagManager({ open, onClose, onSelectTag, selectedTagIds 
     if (!newName.trim()) return
     try {
       await create(newName.trim(), newColor)
+      useAppStore.getState().bumpTagRefresh()
       setNewName('')
       setNewColor('#1677ff')
       message.success('标签创建成功')
@@ -42,6 +44,7 @@ export default function TagManager({ open, onClose, onSelectTag, selectedTagIds 
   const handleDelete = async (id: number) => {
     try {
       await remove(id)
+      useAppStore.getState().bumpTagRefresh()
       message.success('标签已删除')
     } catch {
       message.error('删除失败')
@@ -64,6 +67,7 @@ export default function TagManager({ open, onClose, onSelectTag, selectedTagIds 
     if (!editingTag || !editName.trim()) return
     try {
       await update(editingTag.id, { name: editName.trim(), color: editColor })
+      useAppStore.getState().bumpTagRefresh()
       message.success('标签已更新')
       cancelEdit()
     } catch {

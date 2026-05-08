@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Typography, Space, App, Button, Modal, Input } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAppStore } from '../stores/appStore'
 import { useItems } from '../hooks/useItems'
 import { deleteItem, reprocessItem, updateItem } from '../services/api'
@@ -8,6 +8,7 @@ import TypeFilter from '../components/library/TypeFilter'
 import ItemGrid from '../components/library/ItemGrid'
 import ItemList from '../components/library/ItemList'
 import BatchToolbar from '../components/library/BatchToolbar'
+import TagBar from '../components/library/TagBar'
 import TagManager from '../components/tags/TagManager'
 import type { Item } from '../types'
 
@@ -23,6 +24,9 @@ export default function LibraryPage() {
   const [renameValue, setRenameValue] = useState('')
   const [renaming, setRenaming] = useState(false)
   const { message } = App.useApp()
+  const [searchInput, setSearchInput] = useState('')
+  const setActiveSearchQuery = useAppStore(s => s.setActiveSearchQuery)
+  const loadItems = useAppStore(s => s.loadItems)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -36,6 +40,15 @@ export default function LibraryPage() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [items, clearSelection])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setActiveSearchQuery(searchInput.trim())
+      loadItems()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const handleDelete = async (id: string) => {
     try {
@@ -106,6 +119,7 @@ export default function LibraryPage() {
     setEditingTagIds(newIds)
     try {
       await updateItem(editingItemId, { tag_ids: newIds })
+      useAppStore.getState().bumpTagRefresh()
       message.success('标签已更新')
       refresh()
     } catch {
@@ -115,10 +129,19 @@ export default function LibraryPage() {
 
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <Space>
           <Title level={4} style={{ margin: 0 }}>文件库</Title>
           <TypeFilter />
+          <Input
+            prefix={<SearchOutlined />}
+            placeholder="输入文字筛选..."
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            allowClear
+            size="small"
+            style={{ width: 200 }}
+          />
         </Space>
         <Space>
           <Button
@@ -140,6 +163,8 @@ export default function LibraryPage() {
           <span style={{ color: '#999' }}>共 {total} 个文件</span>
         </Space>
       </div>
+
+      <TagBar />
 
       {viewMode === 'grid' ? (
         <ItemGrid

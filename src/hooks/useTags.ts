@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import * as api from '../services/api'
+import { useAppStore } from '../stores/appStore'
 import type { Tag } from '../types'
 
 export function useTags() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(false)
+  const tagRefreshKey = useAppStore(s => s.tagRefreshKey)
 
   const loadTags = useCallback(async () => {
     setLoading(true)
@@ -20,7 +22,7 @@ export function useTags() {
 
   useEffect(() => {
     loadTags()
-  }, [loadTags])
+  }, [loadTags, tagRefreshKey])
 
   const create = useCallback(async (name: string, color: string) => {
     await api.createTag({ name, color })

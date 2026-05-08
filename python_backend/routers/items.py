@@ -50,6 +50,7 @@ def list_items(
     category: str | None = Query(None),
     status: str | None = Query(None),
     tag_id: int | None = Query(None),
+    q: str | None = Query(None),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200)
 ):
@@ -66,6 +67,9 @@ def list_items(
         if tag_id is not None:
             conditions.append("it.tag_id = ?")
             params.append(tag_id)
+        if q:
+            conditions.append("i.title LIKE ?")
+            params.append(f"%{q}%")
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
