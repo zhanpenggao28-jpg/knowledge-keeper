@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { Row, Col, Empty } from 'antd'
 import type { Item } from '../../types'
 import { useAppStore } from '../../stores/appStore'
@@ -10,79 +10,151 @@ interface Props {
   onDelete: (id: string) => void
   onReprocess: (id: string) => void
   onEditTags: (item: Item) => void
+  onRename: (item: Item) => void
 }
 
-export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, onEditTags }: Props) {
-  const gridRef = useRef<HTMLDivElement>(null)
-  const [selecting, setSelecting] = useState(false)
-  const [box, setBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
-  const startPos = useRef<{ x: number; y: number } | null>(null)
-  const lastPos = useRef<{ x: number; y: number } | null>(null)
-  const gridRectRef = useRef<DOMRect | null>(null)
-  const { toggleSelect } = useAppStore()
+const ZOOM_LEVELS = [
+  { xl: 2, lg: 3, md: 3, sm: 4, xs: 6 },   // 0: tiny
+  { xl: 3, lg: 4, md: 4, sm: 6, xs: 8 },    // 1: small
+  { xl: 4, lg: 6, md: 8, sm: 12, xs: 24 },  // 2: default
+  { xl: 6, lg: 8, md: 8, sm: 12, xs: 24 },  // 3: medium
+  { xl: 8, lg: 12, md: 12, sm: 24, xs: 24 }, // 4: large
+  { xl: 12, lg: 12, md: 24, sm: 24, xs: 24 }, // 5: x-large
+  { xl: 24, lg: 24, md: 24, sm: 24, xs: 24 }, // 6: xx-large
+]
 
+export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
+  const gridRef = useRef<HTMLDivElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number>(0)
+
+  const [selecting, setSelecting] = useState(false)
+  const [zoom, setZoom] = useState(2)
+
+  const selectingRef = useRef(false)
+  const startPos = useRef({ x: 0, y: 0 })
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+
+  const { selectedIds, toggleSelect, selectAll, clearSelection } = useAppStore()
+
+  // ---- Alt + wheel zoom ----
+  const handleWheel = useCallback((e: WheelEvent) => {
+    if (!e.altKey) return
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -1 : 1
+    setZoom(z => Math.max(0, Math.min(ZOOM_LEVELS.length - 1, z + delta)))
+  }, [])
+
+  useEffect(() => {
+    const grid = gridRef.current
+    if (!grid) return
+    grid.addEventListener('wheel', handleWheel, { passive: false })
+    return () => grid.removeEventListener('wheel', handleWheel)
+  }, [handleWheel])
+
+  // ---- Rubber-band selection ----
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    if (target.closest('.ant-card, button, .ant-checkbox, .ant-checkbox-wrapper, .ant-tag')) return
+    if (target.closest('.ant-card, button, .ant-checkbox, .ant-checkbox-wrapper, .ant-tag, .ant-dropdown')) return
 
     e.preventDefault()
     const grid = gridRef.current
     if (!grid) return
 
-    gridRectRef.current = grid.getBoundingClientRect()
+    const r = grid.getBoundingClientRect()
     startPos.current = { x: e.clientX, y: e.clientY }
-    lastPos.current = { x: e.clientX, y: e.clientY }
+
+    // Show the selection box via direct DOM (no re-render)
+    if (boxRef.current) {
+      boxRef.current.style.display = 'block'
+      boxRef.current.style.left = `${e.clientX - r.left}px`
+      boxRef.current.style.top = `${e.clientY - r.top}px`
+      boxRef.current.style.width = '0px'
+      boxRef.current.style.height = '0px'
+    }
+
+    selectingRef.current = true
     setSelecting(true)
-    const r = gridRectRef.current
-    setBox({ x1: e.clientX - r.left, y1: e.clientY - r.top, x2: e.clientX - r.left, y2: e.clientY - r.top })
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!selecting || !startPos.current || !gridRectRef.current) return
-    lastPos.current = { x: e.clientX, y: e.clientY }
-    const r = gridRectRef.current
-    const sx = startPos.current.x - r.left
-    const sy = startPos.current.y - r.top
-    const cx = e.clientX - r.left
-    const cy = e.clientY - r.top
+    if (!selectingRef.current) return
 
-    setBox({
-      x1: Math.min(sx, cx),
-      y1: Math.min(sy, cy),
-      x2: Math.max(sx, cx),
-      y2: Math.max(sy, cy)
+    // Use rAF to throttle DOM updates — avoids layout thrashing
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => {
+      const grid = gridRef.current
+      const box = boxRef.current
+      if (!grid || !box) return
+
+      const r = grid.getBoundingClientRect()
+      const x1 = Math.min(startPos.current.x, e.clientX)
+      const y1 = Math.min(startPos.current.y, e.clientY)
+      const x2 = Math.max(startPos.current.x, e.clientX)
+      const y2 = Math.max(startPos.current.y, e.clientY)
+
+      box.style.left = `${x1 - r.left}px`
+      box.style.top = `${y1 - r.top}px`
+      box.style.width = `${x2 - x1}px`
+      box.style.height = `${y2 - y1}px`
     })
   }
 
-  const handleMouseUp = () => {
-    if (!selecting || !startPos.current || !lastPos.current || !gridRectRef.current) {
-      setSelecting(false); setBox(null); return
-    }
-    const grid = gridRef.current
-    if (grid) {
-      const r = gridRectRef.current
-      const x1 = Math.min(startPos.current.x, lastPos.current.x)
-      const y1 = Math.min(startPos.current.y, lastPos.current.y)
-      const x2 = Math.max(startPos.current.x, lastPos.current.x)
-      const y2 = Math.max(startPos.current.y, lastPos.current.y)
-
-      const cards = grid.querySelectorAll<HTMLElement>('[data-item-id]')
-      cards.forEach(el => {
-        const cr = el.getBoundingClientRect()
-        const cx = cr.left + cr.width / 2
-        const cy = cr.top + cr.height / 2
-        if (cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2) {
-          const id = el.getAttribute('data-item-id')
-          if (id) toggleSelect(id)
-        }
-      })
-    }
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!selectingRef.current) return
+    selectingRef.current = false
     setSelecting(false)
-    setBox(null)
-    startPos.current = null
-    lastPos.current = null
-    gridRectRef.current = null
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+
+    const grid = gridRef.current
+    const box = boxRef.current
+    if (!grid || !box) return
+
+    // Hide the selection box
+    box.style.display = 'none'
+
+    // Only register as a selection if the user actually moved
+    const dx = Math.abs(e.clientX - startPos.current.x)
+    const dy = Math.abs(e.clientY - startPos.current.y)
+    if (dx < 4 && dy < 4) {
+      // Click on empty space → clear selection
+      clearSelection()
+      return
+    }
+
+    // Determine selection rectangle in page coordinates
+    const x1 = Math.min(startPos.current.x, e.clientX)
+    const y1 = Math.min(startPos.current.y, e.clientY)
+    const x2 = Math.max(startPos.current.x, e.clientX)
+    const y2 = Math.max(startPos.current.y, e.clientY)
+
+    // Without Ctrl: replace selection. With Ctrl: add to selection.
+    if (!e.ctrlKey && !e.metaKey) {
+      clearSelection()
+    }
+
+    const cards = grid.querySelectorAll<HTMLElement>('[data-item-id]')
+    cards.forEach(el => {
+      const cr = el.getBoundingClientRect()
+      // Rectangle intersection: select if the box touches any part of the card
+      const hits = !(cr.right < x1 || cr.left > x2 || cr.bottom < y1 || cr.top > y2)
+      if (hits) {
+        const id = el.getAttribute('data-item-id')
+        if (id) {
+          const isSelected = selectedIds.has(id)
+          if (e.ctrlKey || e.metaKey) {
+            if (!isSelected) toggleSelect(id)
+          } else {
+            if (!isSelected) toggleSelect(id)
+          }
+        }
+      }
+    })
   }
+
+  const cols = ZOOM_LEVELS[zoom]
 
   if (items.length === 0) {
     return <Empty description="还没有文件，点击右上角「导入文件」开始" />
@@ -95,11 +167,11 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      style={{ position: 'relative', userSelect: 'none', minHeight: 200 }}
+      style={{ position: 'relative', userSelect: 'none', minHeight: 200, overflowY: 'auto' }}
     >
       <Row gutter={[16, 16]}>
         {items.map(item => (
-          <Col key={item.id} xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Col key={item.id} xs={cols.xs} sm={cols.sm} md={cols.md} lg={cols.lg} xl={cols.xl}>
             <div data-item-id={item.id}>
               <ItemCard
                 item={item}
@@ -107,25 +179,25 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
                 onDelete={onDelete}
                 onReprocess={onReprocess}
                 onEditTags={onEditTags}
+                onRename={onRename}
               />
             </div>
           </Col>
         ))}
       </Row>
 
-      {box && (
-        <div style={{
+      {/* Selection box — positioned via direct DOM in mousemove for smoothness */}
+      <div
+        ref={boxRef}
+        style={{
+          display: 'none',
           position: 'absolute',
-          left: box.x1,
-          top: box.y1,
-          width: box.x2 - box.x1,
-          height: box.y2 - box.y1,
-          background: 'rgba(212, 182, 95, 0.12)',
-          border: '1px dashed #d4b65f',
+          background: selecting ? 'rgba(212, 182, 95, 0.12)' : 'transparent',
+          border: selecting ? '1px dashed #d4b65f' : 'none',
           pointerEvents: 'none',
           zIndex: 10
-        }} />
-      )}
+        }}
+      />
     </div>
   )
 }

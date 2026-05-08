@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Space, App, Button } from 'antd'
+import { Typography, Space, App, Button, Modal, Input } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useAppStore } from '../stores/appStore'
 import { useItems } from '../hooks/useItems'
@@ -18,6 +18,9 @@ export default function LibraryPage() {
   const { viewMode, selectItem, setPreviewOpen, selectedIds, clearSelection } = useAppStore()
   const [tagManagerOpen, setTagManagerOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
+  const [renameItem, setRenameItem] = useState<Item | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renaming, setRenaming] = useState(false)
   const { message } = App.useApp()
 
   // Keyboard shortcuts
@@ -55,6 +58,42 @@ export default function LibraryPage() {
   const handleEditTags = (item: Item) => {
     setEditingItem(item)
     setTagManagerOpen(true)
+  }
+
+  const handleRename = (item: Item) => {
+    setRenameItem(item)
+    setRenameValue(item.original_name)
+  }
+
+  const handleRenameConfirm = async () => {
+    if (!renameItem || !renameValue.trim() || renameValue === renameItem.original_name) {
+      setRenameItem(null); return
+    }
+    setRenaming(true)
+    try {
+      const result = await window.electronAPI!.renameFile(
+        renameItem.file_path,
+        renameItem.original_path,
+        renameValue
+      )
+      if (!result.success) {
+        message.error('重命名失败（可能同名文件已存在）')
+        return
+      }
+      const ext = renameValue.includes('.') ? renameValue.substring(renameValue.lastIndexOf('.') + 1) : renameItem.file_type
+      const baseName = renameValue.includes('.') ? renameValue.substring(0, renameValue.lastIndexOf('.')) : renameValue
+      await updateItem(renameItem.id, { title: baseName, originalName: renameValue })
+      if (result.newPath) {
+        await window.electronAPI!.relocateFile(renameItem.id, result.newPath)
+      }
+      message.success('已重命名')
+      refresh()
+      setRenameItem(null)
+    } catch {
+      message.error('重命名失败')
+    } finally {
+      setRenaming(false)
+    }
   }
 
   const handleSelectTag = async (tag: { id: number }) => {
@@ -110,6 +149,7 @@ export default function LibraryPage() {
           onDelete={handleDelete}
           onReprocess={handleReprocess}
           onEditTags={handleEditTags}
+          onRename={handleRename}
         />
       ) : (
         <ItemList
@@ -118,6 +158,7 @@ export default function LibraryPage() {
           onDelete={handleDelete}
           onReprocess={handleReprocess}
           onEditTags={handleEditTags}
+          onRename={handleRename}
         />
       )}
 
@@ -128,6 +169,27 @@ export default function LibraryPage() {
       />
 
       <BatchToolbar onRefresh={refresh} />
+
+      <Modal
+        title="重命名文件"
+        open={!!renameItem}
+        onOk={handleRenameConfirm}
+        onCancel={() => { setRenameItem(null); setRenameValue('') }}
+        confirmLoading={renaming}
+        okText="确认"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Input
+          value={renameValue}
+          onChange={e => setRenameValue(e.target.value)}
+          onPressEnter={handleRenameConfirm}
+          style={{ marginTop: 8 }}
+        />
+        <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+          重命名会同时修改文件夹中的实际文件名
+        </div>
+      </Modal>
     </div>
   )
 }

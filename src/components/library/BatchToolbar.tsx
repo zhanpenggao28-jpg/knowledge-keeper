@@ -40,20 +40,15 @@ export default function BatchToolbar({ onRefresh }: Props) {
     if (!window.electronAPI) return
     const dir = await window.electronAPI.selectDirectory()
     if (!dir) return
-
-    // Copy each selected file to target directory
     const ids = Array.from(selectedIds)
     const selected = items.filter(i => ids.includes(i.id))
-    let done = 0
-    for (const item of selected) {
-      try {
-        // We use drag to export by opening the storage folder
-        await window.electronAPI.dragFile(item.file_path, item.original_path)
-      } catch { /* skip */ }
+    const entries = selected.map(i => ({ relativePath: i.file_path, originalPath: i.original_path }))
+    const result = await window.electronAPI.copyFiles(entries, dir)
+    if (result.failed > 0) {
+      message.warning(`已复制 ${result.copied} 个，${result.failed} 个失败`)
+    } else {
+      message.success(`已导出 ${result.copied} 个文件`)
     }
-    // For batch export, open the storage location for each file
-    window.electronAPI.openInExplorer(selected[0]?.file_path || '', selected[0]?.original_path)
-    message.info('请从打开的文件夹中拖出文件')
     clearSelection()
   }
 

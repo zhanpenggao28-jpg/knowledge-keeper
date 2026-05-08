@@ -17,6 +17,7 @@ interface Props {
   onDelete: (id: string) => void
   onReprocess: (id: string) => void
   onEditTags: (item: Item) => void
+  onRename: (item: Item) => void
 }
 
 function formatSize(bytes: number): string {
@@ -51,7 +52,7 @@ function ThumbIcon({ item }: { item: Item }) {
   }
 }
 
-export default function ItemList({ items, onItemClick, onDelete, onReprocess, onEditTags }: Props) {
+export default function ItemList({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
   const { selectedIds, toggleSelect, selectAll, clearSelection } = useAppStore()
 
   if (items.length === 0) {
@@ -145,6 +146,7 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
       width: 180,
       render: (_: any, record: Item) => (
         <Space size="small">
+          <Button size="small" onClick={() => onRename(record)}>重命名</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => onEditTags(record)}>标签</Button>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => onReprocess(record.id)} />
           <Button size="small" icon={<FolderOpenOutlined />} onClick={() => window.electronAPI?.openInExplorer(record.file_path, record.original_path)} />
@@ -179,7 +181,14 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
               document.removeEventListener('mousemove', onMove)
               document.removeEventListener('mouseup', onUp)
               console.log('[drag-list] trigger on', record.category, record.file_type)
-              window.electronAPI?.dragFile(record.file_path, record.original_path)
+              const state = useAppStore.getState()
+              if (state.selectedIds.has(record.id) && state.selectedIds.size > 1) {
+                const selectedItems = state.items.filter(i => state.selectedIds.has(i.id))
+                const entries = selectedItems.map(i => ({ relativePath: i.file_path, originalPath: i.original_path }))
+                window.electronAPI?.dragFiles(entries)
+              } else {
+                window.electronAPI?.dragFile(record.file_path, record.original_path)
+              }
             }
           }
           const onUp = () => {

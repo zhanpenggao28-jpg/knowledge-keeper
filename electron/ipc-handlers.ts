@@ -1,4 +1,4 @@
-import { IpcMain, BrowserWindow, app } from 'electron'
+import { IpcMain, BrowserWindow, app, nativeImage } from 'electron'
 import { FileManager } from './file-manager'
 import { SidecarManager } from './sidecar'
 import path from 'path'
@@ -63,6 +63,14 @@ export function registerIpcHandlers(
     fileManager.openInExplorer(relativePath, originalPath)
   })
 
+  ipcMain.handle('rename-file', (_event, relativePath: string, originalPath: string | null | undefined, newName: string) => {
+    return fileManager.renameFile(relativePath, originalPath, newName)
+  })
+
+  ipcMain.handle('copy-files', (_event, entries: Array<{ relativePath: string; originalPath?: string | null }>, destDir: string) => {
+    return fileManager.copyFiles(entries, destDir)
+  })
+
   ipcMain.handle('get-app-paths', () => ({
     userData: app.getPath('userData'),
     storagePath: fileManager.getStoragePath()
@@ -74,7 +82,20 @@ export function registerIpcHandlers(
     try {
       const ext = path.extname(absPath).toLowerCase()
       const imgExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
-      const icon = imgExts.includes(ext) ? absPath : await app.getFileIcon(absPath, { size: 'normal' })
+      let icon: Electron.NativeImage
+      if (imgExts.includes(ext)) {
+        const img = nativeImage.createFromPath(absPath)
+        const size = img.getSize()
+        const maxDim = 64
+        if (size.width > maxDim || size.height > maxDim) {
+          const ratio = Math.min(maxDim / size.width, maxDim / size.height)
+          icon = img.resize({ width: Math.round(size.width * ratio), height: Math.round(size.height * ratio) })
+        } else {
+          icon = img
+        }
+      } else {
+        icon = await app.getFileIcon(absPath, { size: 'normal' })
+      }
       console.log('[drag-ipc] calling startDrag...')
       const t0 = Date.now()
       event.sender.startDrag({ file: absPath, icon })
@@ -82,6 +103,31 @@ export function registerIpcHandlers(
       return true
     } catch (err: any) {
       console.error('[drag-ipc] startDrag failed:', err.message, err.stack)
+      return false
+    }
+  })
+
+  ipcMain.handle('drag-files', async (event, entries: Array<{ relativePath: string; originalPath?: string | null }>) => {
+    const absPaths = entries.map(e => fileManager.resolveWorkingPath(e.originalPath, e.relativePath)).filter(p => require('fs').existsSync(p))
+    if (absPaths.length === 0) return false
+    console.log('[drag-ipc] batch drag', absPaths.length, 'files')
+    try {
+      const firstExt = path.extname(absPaths[0]).toLowerCase()
+      const imgExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+      let icon = imgExts.includes(firstExt) ? nativeImage.createFromPath(absPaths[0]) : await app.getFileIcon(absPaths[0], { size: 'normal' })
+      if (imgExts.includes(firstExt)) {
+        const size = icon.getSize()
+        const maxDim = 64
+        if (size.width > maxDim || size.height > maxDim) {
+          const ratio = Math.min(maxDim / size.width, maxDim / size.height)
+          icon = icon.resize({ width: Math.round(size.width * ratio), height: Math.round(size.height * ratio) })
+        }
+      }
+      event.sender.startDrag({ files: absPaths, icon })
+      console.log('[drag-ipc] batch startDrag OK')
+      return true
+    } catch (err: any) {
+      console.error('[drag-ipc] batch startDrag failed:', err.message)
       return false
     }
   })

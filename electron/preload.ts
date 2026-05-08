@@ -7,9 +7,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('import-files', options),
   openInExplorer: (filePath: string, originalPath?: string | null) =>
     ipcRenderer.invoke('open-in-explorer', filePath, originalPath),
+  renameFile: (relativePath: string, originalPath: string | null | undefined, newName: string) =>
+    ipcRenderer.invoke('rename-file', relativePath, originalPath, newName),
+  copyFiles: (entries: Array<{ relativePath: string; originalPath?: string | null }>, destDir: string) =>
+    ipcRenderer.invoke('copy-files', entries, destDir),
   getAppPaths: () => ipcRenderer.invoke('get-app-paths'),
   dragFile: (relativePath: string, originalPath?: string | null) =>
     ipcRenderer.invoke('drag-file', relativePath, originalPath),
+  dragFiles: (entries: Array<{ relativePath: string; originalPath?: string | null }>) =>
+    ipcRenderer.invoke('drag-files', entries),
   getSidecarPort: () => ipcRenderer.invoke('get-sidecar-port'),
   getSidecarStatus: () => ipcRenderer.invoke('get-sidecar-status'),
   getSettings: () => ipcRenderer.invoke('get-settings'),

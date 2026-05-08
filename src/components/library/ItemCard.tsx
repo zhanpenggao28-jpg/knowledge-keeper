@@ -21,6 +21,7 @@ interface Props {
   onDelete: (id: string) => void
   onReprocess: (id: string) => void
   onEditTags: (item: Item) => void
+  onRename: (item: Item) => void
 }
 
 function getIcon(category: string, size: number = 32) {
@@ -39,8 +40,9 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const menuItems = (item: Item, onDelete: Props['onDelete'], onReprocess: Props['onReprocess'], onEditTags: Props['onEditTags']) => [
+const menuItems = (item: Item, onDelete: Props['onDelete'], onReprocess: Props['onReprocess'], onEditTags: Props['onEditTags'], onRename: Props['onRename']) => [
   { key: 'open', icon: <FolderOpenOutlined />, label: '打开位置', onClick: () => window.electronAPI?.openInExplorer(item.file_path, item.original_path) },
+  { key: 'rename', icon: <EditOutlined />, label: '重命名', onClick: () => onRename(item) },
   { key: 'tags', icon: <EditOutlined />, label: '编辑标签', onClick: () => onEditTags(item) },
   { key: 'reprocess', icon: <ReloadOutlined />, label: '重新处理', onClick: () => onReprocess(item.id) },
   { type: 'divider' as const },
@@ -123,7 +125,7 @@ function ThumbContent({ item }: { item: Item }) {
   )
 }
 
-export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditTags }: Props) {
+export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
   const { selectedIds, toggleSelect } = useAppStore()
   const isSelected = selectedIds.has(item.id)
   const [hovered, setHovered] = useState(false)
@@ -145,7 +147,16 @@ export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditT
         document.removeEventListener('mousemove', onMove)
         document.removeEventListener('mouseup', onUp)
         console.log('[drag] trigger on', item.category, item.file_type)
-        window.electronAPI?.dragFile(item.file_path, item.original_path)
+
+        // If this item is part of a multi-selection, drag all selected items
+        const state = useAppStore.getState()
+        if (isSelected && state.selectedIds.size > 1) {
+          const selectedItems = state.items.filter(i => state.selectedIds.has(i.id))
+          const entries = selectedItems.map(i => ({ relativePath: i.file_path, originalPath: i.original_path }))
+          window.electronAPI?.dragFiles(entries)
+        } else {
+          window.electronAPI?.dragFile(item.file_path, item.original_path)
+        }
       }
     }
     const onUp = () => {
@@ -161,7 +172,7 @@ export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditT
       onMouseDown={handleMouseDown}
       style={{ height: '100%', cursor: 'grab', userSelect: 'none' as any }}
     >
-    <Dropdown menu={{ items: menuItems(item, onDelete, onReprocess, onEditTags) }} trigger={['contextMenu']}>
+    <Dropdown menu={{ items: menuItems(item, onDelete, onReprocess, onEditTags, onRename) }} trigger={['contextMenu']}>
       <Card
         hoverable
         onMouseEnter={() => setHovered(true)}

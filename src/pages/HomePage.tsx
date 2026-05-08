@@ -72,6 +72,7 @@ export default function HomePage() {
         onDelete={async (id) => { await (await import('../services/api')).deleteItem(id); refresh() }}
         onReprocess={async (id) => { await (await import('../services/api')).reprocessItem(id) }}
         onEditTags={() => {}}
+        onRename={() => {}}
       />
 
       <ImportDialog open={importOpen} onClose={() => { setImportOpen(false); refresh() }} />

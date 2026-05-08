@@ -77,7 +77,7 @@ export async function createItem(body: {
 
 export async function updateItem(
   id: string,
-  body: { title?: string; tag_ids?: number[] }
+  body: { title?: string; tag_ids?: number[]; originalName?: string }
 ): Promise<void> {
   await api.put(`/items/${id}`, body)
 }

@@ -17,8 +17,11 @@ interface ElectronAPI {
   selectFiles: () => Promise<string[]>
   selectDirectory: () => Promise<string | null>
   importFiles: (options: ImportFileOptions) => Promise<any[]>
-  dragFile: (relativePath: string, originalPath?: string | null) => void
+  dragFile: (relativePath: string, originalPath?: string | null) => Promise<boolean>
+  dragFiles: (entries: Array<{ relativePath: string; originalPath?: string | null }>) => Promise<boolean>
   openInExplorer: (filePath: string, originalPath?: string | null) => Promise<void>
+  renameFile: (relativePath: string, originalPath: string | null | undefined, newName: string) => Promise<{ success: boolean; newPath?: string; newOriginalName?: string }>
+  copyFiles: (entries: Array<{ relativePath: string; originalPath?: string | null }>, destDir: string) => Promise<{ copied: number; failed: number }>
   getAppPaths: () => Promise<{ userData: string; storagePath: string }>
   getSidecarPort: () => Promise<number>
   getSidecarStatus: () => Promise<'starting' | 'running' | 'stopped' | 'error'>

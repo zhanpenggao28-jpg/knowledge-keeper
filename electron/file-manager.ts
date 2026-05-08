@@ -156,6 +156,58 @@ export class FileManager {
     shell.showItemInFolder(fullPath)
   }
 
+  copyFiles(entries: Array<{ relativePath: string; originalPath?: string | null }>, destDir: string): { copied: number; failed: number } {
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true })
+    }
+    let copied = 0; let failed = 0
+    for (const entry of entries) {
+      const src = this.resolveWorkingPath(entry.originalPath, entry.relativePath)
+      if (!fs.existsSync(src)) { failed++; continue }
+      const dest = path.join(destDir, path.basename(src))
+      try {
+        // If destination exists, add a suffix
+        let finalDest = dest
+        let counter = 1
+        while (fs.existsSync(finalDest)) {
+          const ext = path.extname(dest)
+          const base = path.basename(dest, ext)
+          finalDest = path.join(destDir, `${base} (${counter})${ext}`)
+          counter++
+        }
+        fs.copyFileSync(src, finalDest)
+        copied++
+      } catch { failed++ }
+    }
+    return { copied, failed }
+  }
+
+  renameFile(relativePath: string, originalPath: string | null | undefined, newName: string): { success: boolean; newPath?: string; newOriginalName?: string } {
+    const absPath = this.resolveWorkingPath(originalPath, relativePath)
+    const dir = path.dirname(absPath)
+    const newPath = path.join(dir, newName)
+
+    // Don't overwrite existing files
+    if (fs.existsSync(newPath)) {
+      return { success: false }
+    }
+
+    try {
+      fs.renameSync(absPath, newPath)
+
+      // If we renamed the original file, update original_path
+      const workingIsOriginal = originalPath && absPath === originalPath
+      return {
+        success: true,
+        newOriginalName: newName,
+        newPath: workingIsOriginal ? newPath : undefined
+      }
+    } catch (err) {
+      console.error('Rename failed:', err)
+      return { success: false }
+    }
+  }
+
   getSettings(): Record<string, unknown> {
     try {
       const file = path.join(this.userDataPath, 'settings.json')
