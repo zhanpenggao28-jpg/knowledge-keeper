@@ -23,12 +23,12 @@ interface Props {
 }
 
 function getIcon(category: string, size: number = 32) {
-  const style = { fontSize: size, color: '#1677ff' }
+  const gold = '#d4b65f'
   switch (category) {
-    case 'document': return <FileTextOutlined style={{ fontSize: size, color: '#1677ff' }} />
-    case 'video': return <VideoCameraOutlined style={{ fontSize: size, color: '#52c41a' }} />
-    case 'image': return <PictureOutlined style={{ fontSize: size, color: '#fa8c16' }} />
-    default: return <FileTextOutlined style={{ fontSize: size, color: '#999' }} />
+    case 'document': return <FileTextOutlined style={{ fontSize: size, color: gold }} />
+    case 'video': return <VideoCameraOutlined style={{ fontSize: size, color: gold }} />
+    case 'image': return <PictureOutlined style={{ fontSize: size, color: gold }} />
+    default: return <FileTextOutlined style={{ fontSize: size, color: '#666' }} />
   }
 }
 
@@ -61,7 +61,7 @@ function ThumbContent({ item }: { item: Item }) {
           height: 120,
           objectFit: 'cover',
           borderRadius: 6,
-          background: '#f5f5f5'
+          background: '#1a1a1a'
         }}
       />
     )
@@ -80,7 +80,7 @@ function ThumbContent({ item }: { item: Item }) {
           height: 120,
           objectFit: 'cover',
           borderRadius: 6,
-          background: '#f5f5f5'
+          background: '#1a1a1a'
         }}
       />
     )
@@ -93,12 +93,12 @@ function ThumbContent({ item }: { item: Item }) {
         width: '100%',
         height: 100,
         padding: '6px 8px',
-        background: '#fafafa',
+        background: '#1a1a1a',
         borderRadius: 6,
         overflow: 'hidden',
         fontSize: 11,
         lineHeight: '18px',
-        color: '#666',
+        color: '#999',
         whiteSpace: 'pre-wrap',
         fontFamily: 'monospace'
       }}>

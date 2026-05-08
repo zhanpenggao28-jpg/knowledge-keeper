@@ -7,15 +7,22 @@
 :root {
   --sidebar-width: 240px;
   --header-height: 56px;
-  --bg-base: #f5f5f5;
-  --bg-white: #ffffff;
+  --bg-base: #141414;
+  --bg-elevated: #1e1e1e;
+  --bg-card: #262626;
+  --gold: #d4b65f;
+  --gold-light: #f4e7b4;
+  --gold-dark: #826f42;
+  --text-primary: #e8e8e8;
+  --text-secondary: #999;
+  --border-color: #333;
 }
 
 html, body, #root {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg-base);
-  color: #333;
+  color: var(--text-primary);
 }
 
 ::-webkit-scrollbar {
@@ -24,7 +31,7 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #555;
   border-radius: 3px;
 }
 

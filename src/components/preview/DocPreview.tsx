@@ -19,7 +19,7 @@ export default function DocPreview({ filePath, preview }: Props) {
         position: 'relative',
         width: '100%',
         height: 400,
-        background: '#f5f5f5',
+        background: '#1a1a1a',
         borderRadius: 8,
         display: 'flex',
         alignItems: 'center',
@@ -53,7 +53,7 @@ export default function DocPreview({ filePath, preview }: Props) {
       style={{
         width: '100%',
         height: 600,
-        border: '1px solid #f0f0f0',
+        border: '1px solid #333',
         borderRadius: 8
       }}
       title="PDF 预览"

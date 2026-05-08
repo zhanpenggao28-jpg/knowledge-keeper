@@ -17,7 +17,7 @@ export default function ImagePreview({ filePath, preview }: Props) {
         maxHeight: 500,
         objectFit: 'contain',
         borderRadius: 8,
-        background: '#fafafa'
+        background: '#1a1a1a'
       }}
     />
   )

@@ -57,8 +57,8 @@ export default function PreviewDrawer({ open, item, onClose }: Props) {
       {item.category === 'document' && item.file_type !== 'pdf' && <TextPreview itemId={item.id} />}
 
       {item.summary && (
-        <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
-          <Title level={5}>AI 摘要</Title>
+        <div style={{ marginTop: 16, padding: 12, background: '#2a2218', borderRadius: 8, border: '1px solid #826f42' }}>
+          <Title level={5} style={{ color: '#d4b65f' }}>AI 摘要</Title>
           <p>{item.summary}</p>
         </div>
       )}

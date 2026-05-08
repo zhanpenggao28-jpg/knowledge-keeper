@@ -42,11 +42,11 @@ function ThumbIcon({ item }: { item: Item }) {
     )
   }
 
-  const iconStyle = { fontSize: 20 }
+  const iconStyle = { fontSize: 20, color: '#d4b65f' }
   switch (item.category) {
-    case 'video': return <VideoCameraOutlined style={{ ...iconStyle, color: '#52c41a' }} />
-    case 'image': return <PictureOutlined style={{ ...iconStyle, color: '#fa8c16' }} />
-    default: return <FileTextOutlined style={{ ...iconStyle, color: '#1677ff' }} />
+    case 'video': return <VideoCameraOutlined style={iconStyle} />
+    case 'image': return <PictureOutlined style={iconStyle} />
+    default: return <FileTextOutlined style={iconStyle} />
   }
 }
 

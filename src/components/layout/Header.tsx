@@ -17,8 +17,7 @@ export default function Header() {
     <div
       style={{
         height: 56,
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid var(--border-color)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 24px',

@@ -29,7 +29,7 @@ export default function SearchResults({ items, total }: { items: Item[]; total: 
           style={{
             cursor: 'pointer',
             padding: '16px',
-            background: '#fff',
+            background: '#1e1e1e',
             borderRadius: 8,
             marginBottom: 8,
             transition: 'box-shadow 0.2s'

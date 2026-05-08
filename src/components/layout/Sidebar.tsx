@@ -38,7 +38,7 @@ export default function Sidebar() {
 
   return (
     <div style={{ padding: '16px 0' }}>
-      <div style={{ padding: '0 24px 16px', fontWeight: 700, fontSize: 18, color: '#1677ff' }}>
+      <div style={{ padding: '0 24px 16px', fontWeight: 700, fontSize: 18, color: '#d4b65f' }}>
         知识管家
       </div>
       <Menu

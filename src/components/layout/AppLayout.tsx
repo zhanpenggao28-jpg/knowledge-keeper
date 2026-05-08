@@ -15,8 +15,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <Sider
         width={240}
         style={{
-          background: '#fff',
-          borderRight: '1px solid #f0f0f0',
+          borderRight: '1px solid var(--border-color)',
           overflow: 'auto'
         }}
       >
@@ -27,8 +26,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <Content
           style={{
             padding: 24,
-            overflow: 'auto',
-            background: '#f5f5f5'
+            overflow: 'auto'
           }}
         >
           {children}
