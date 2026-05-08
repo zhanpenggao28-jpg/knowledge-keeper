@@ -1,6 +1,6 @@
 {
   "name": "knowledge-keeper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "个人知识管理工具 - 文档和视频整理、搜索、AI 识别",
   "main": "dist-electron/main.js",
   "scripts": {

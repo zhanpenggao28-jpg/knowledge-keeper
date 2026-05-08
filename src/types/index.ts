@@ -7,6 +7,7 @@ export interface Item {
   original_name: string
   file_size: number
   file_hash: string
+  original_path: string | null
   thumbnail: string | null
   preview: string | null
   extracted_text: string

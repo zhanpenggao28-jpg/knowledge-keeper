@@ -8,7 +8,7 @@ import PreviewDrawer from '../preview/PreviewDrawer'
 const { Content, Sider } = Layout
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const { selectedItem, previewOpen, setPreviewOpen } = useAppStore()
+  const { selectedItem, previewOpen, setPreviewOpen, refreshKey } = useAppStore()
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -36,6 +36,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         open={previewOpen}
         item={selectedItem}
         onClose={() => setPreviewOpen(false)}
+        refreshKey={refreshKey}
       />
     </Layout>
   )

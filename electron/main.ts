@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { SidecarManager } from './sidecar'
 import { FileManager } from './file-manager'
 import { registerIpcHandlers } from './ipc-handlers'
@@ -31,9 +32,20 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData')
-  const storagePath = path.join(app.getPath('documents'), 'KnowledgeKeeper')
 
-  fileManager = new FileManager(storagePath)
+  // Check for custom storage path in settings
+  let storagePath = path.join(app.getPath('documents'), 'KnowledgeKeeper')
+  try {
+    const settingsFile = path.join(userDataPath, 'settings.json')
+    if (fs.existsSync(settingsFile)) {
+      const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'))
+      if (settings.customStoragePath && typeof settings.customStoragePath === 'string') {
+        storagePath = settings.customStoragePath
+      }
+    }
+  } catch { /* fall back to default */ }
+
+  fileManager = new FileManager(storagePath, userDataPath)
   sidecar = new SidecarManager(path.join(__dirname, '../python_backend'), storagePath)
 
   registerIpcHandlers(ipcMain, fileManager, sidecar)

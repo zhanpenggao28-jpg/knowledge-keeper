@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS items (
     file_hash   TEXT,
     thumbnail   TEXT,
     preview     TEXT,
+    original_path TEXT,
     extracted_text TEXT DEFAULT '',
     summary     TEXT DEFAULT '',
     status      TEXT NOT NULL DEFAULT 'pending',

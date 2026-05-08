@@ -47,3 +47,5 @@ def _run_migrations(conn: sqlite3.Connection):
     cols = [row['name'] for row in conn.execute("PRAGMA table_info(items)").fetchall()]
     if 'preview' not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN preview TEXT")
+    if 'original_path' not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN original_path TEXT")

@@ -12,13 +12,27 @@ export interface ImportedFile {
   filePath: string
   fileSize: number
   fileHash: string
+  originalPath: string | null
 }
+
+export interface ImportOptions {
+  filePaths: string[]
+  targetDir?: string
+  prefix?: string
+  suffix?: string
+}
+
+const FILE_FILTERS = [
+  { name: '支持的文件', extensions: ['pdf', 'docx', 'doc', 'txt', 'pptx', 'ppt', 'md', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'mp4', 'mkv', 'avi', 'mov', 'webm'] }
+]
 
 export class FileManager {
   private storagePath: string
+  private userDataPath: string
 
-  constructor(storagePath: string) {
+  constructor(storagePath: string, userDataPath: string) {
     this.storagePath = storagePath
+    this.userDataPath = userDataPath
     fs.mkdirSync(path.join(storagePath, 'files'), { recursive: true })
   }
 
@@ -26,36 +40,61 @@ export class FileManager {
     return this.storagePath
   }
 
-  async importFiles(): Promise<ImportedFile[]> {
+  getAbsolutePath(relativePath: string): string {
+    return path.join(this.storagePath, 'files', relativePath)
+  }
+
+  async selectFiles(): Promise<string[]> {
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: '支持的文件', extensions: ['pdf', 'docx', 'doc', 'txt', 'pptx', 'ppt', 'md', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'mp4', 'mkv', 'avi', 'mov', 'webm'] }
-      ]
+      filters: FILE_FILTERS
     })
-
     if (result.canceled || result.filePaths.length === 0) return []
+    return result.filePaths
+  }
+
+  async selectDirectory(): Promise<string | null> {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  }
+
+  async importFiles(options: ImportOptions): Promise<ImportedFile[]> {
+    const { filePaths, targetDir, prefix, suffix } = options
+    if (filePaths.length === 0) return []
+
+    // Ensure target directory exists if organizing
+    if (targetDir) {
+      fs.mkdirSync(targetDir, { recursive: true })
+    }
 
     const imported: ImportedFile[] = []
 
-    for (const sourcePath of result.filePaths) {
-      const file = await this.importSingleFile(sourcePath)
+    for (const sourcePath of filePaths) {
+      const file = await this.importSingleFile(sourcePath, { targetDir, prefix, suffix })
       if (file) imported.push(file)
     }
 
     return imported
   }
 
-  private async importSingleFile(sourcePath: string): Promise<ImportedFile | null> {
+  private async importSingleFile(
+    sourcePath: string,
+    organize?: { targetDir: string; prefix?: string; suffix?: string }
+  ): Promise<ImportedFile | null> {
     try {
       const stat = fs.statSync(sourcePath)
       const ext = path.extname(sourcePath).toLowerCase().replace('.', '')
       const originalName = path.basename(sourcePath)
+      const baseName = path.basename(sourcePath, path.extname(sourcePath))
 
       const fileBuffer = fs.readFileSync(sourcePath)
       const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
       const hashDir = hash.substring(0, 16)
 
+      // Copy to internal storage
       const targetDir = path.join(this.storagePath, 'files', hashDir)
       fs.mkdirSync(targetDir, { recursive: true })
 
@@ -63,15 +102,28 @@ export class FileManager {
       const targetPath = path.join(targetDir, `original${targetExt}`)
       fs.copyFileSync(sourcePath, targetPath)
 
+      // Optionally organize to custom directory (move: copy then delete source)
+      let originalPath: string | null = sourcePath
+      if (organize?.targetDir) {
+        const pfx = organize.prefix || ''
+        const sfx = organize.suffix || ''
+        const newName = `${pfx}${baseName}${sfx}${targetExt}`
+        const destPath = path.join(organize.targetDir, newName)
+        fs.copyFileSync(sourcePath, destPath)
+        fs.unlinkSync(sourcePath)
+        originalPath = destPath
+      }
+
       return {
         id: '',
-        title: path.basename(sourcePath, path.extname(sourcePath)),
+        title: baseName,
         originalName,
         fileType: ext,
         category: this.categorize(ext),
         filePath: `${hashDir}/original${targetExt}`,
         fileSize: stat.size,
-        fileHash: hash
+        fileHash: hash,
+        originalPath
       }
     } catch (err) {
       console.error(`Failed to import ${sourcePath}:`, err)
@@ -90,8 +142,61 @@ export class FileManager {
     return 'other'
   }
 
-  openInExplorer(relativePath: string): void {
-    const fullPath = path.join(this.storagePath, 'files', relativePath)
+  resolveWorkingPath(originalPath: string | null | undefined, relativePath: string): string {
+    if (originalPath) {
+      try {
+        if (fs.existsSync(originalPath)) return originalPath
+      } catch { /* permission error, fall through */ }
+    }
+    return this.getAbsolutePath(relativePath)
+  }
+
+  openInExplorer(relativePath: string, originalPath?: string | null): void {
+    const fullPath = this.resolveWorkingPath(originalPath, relativePath)
     shell.showItemInFolder(fullPath)
+  }
+
+  getSettings(): Record<string, unknown> {
+    try {
+      const file = path.join(this.userDataPath, 'settings.json')
+      if (fs.existsSync(file)) {
+        return JSON.parse(fs.readFileSync(file, 'utf-8'))
+      }
+    } catch { /* ignore */ }
+    return {}
+  }
+
+  setStoragePath(newPath: string): boolean {
+    try {
+      const file = path.join(this.userDataPath, 'settings.json')
+      const settings = this.getSettings()
+      settings['customStoragePath'] = newPath
+      fs.writeFileSync(file, JSON.stringify(settings, null, 2), 'utf-8')
+      return true
+    } catch (err) {
+      console.error('Failed to save settings:', err)
+      return false
+    }
+  }
+
+  findFileByHash(fileHash: string, searchDir: string): string | null {
+    if (!fs.existsSync(searchDir)) return null
+    try {
+      const entries = fs.readdirSync(searchDir, { withFileTypes: true })
+      for (const entry of entries) {
+        const fullPath = path.join(searchDir, entry.name)
+        if (entry.isFile()) {
+          try {
+            const buf = fs.readFileSync(fullPath)
+            const hash = crypto.createHash('sha256').update(buf).digest('hex')
+            if (hash === fileHash) return fullPath
+          } catch { /* skip unreadable files */ }
+        } else if (entry.isDirectory()) {
+          const found = this.findFileByHash(fileHash, fullPath)
+          if (found) return found
+        }
+      }
+    } catch { /* skip */ }
+    return null
   }
 }

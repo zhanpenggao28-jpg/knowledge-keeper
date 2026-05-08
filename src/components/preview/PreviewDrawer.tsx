@@ -12,6 +12,7 @@ interface Props {
   open: boolean
   item: Item | null
   onClose: () => void
+  refreshKey: number
 }
 
 function formatSize(bytes: number): string {
@@ -20,7 +21,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function PreviewDrawer({ open, item, onClose }: Props) {
+export default function PreviewDrawer({ open, item, onClose, refreshKey }: Props) {
   if (!item) {
     return (
       <Drawer open={open} onClose={onClose} width={640} title="预览">
@@ -54,7 +55,7 @@ export default function PreviewDrawer({ open, item, onClose }: Props) {
       {item.category === 'image' && <ImagePreview filePath={item.file_path} preview={item.preview} />}
       {item.category === 'video' && <VideoPreview filePath={item.file_path} thumbnail={item.thumbnail} />}
       {item.category === 'document' && item.file_type === 'pdf' && <DocPreview filePath={item.file_path} preview={item.preview} />}
-      {item.category === 'document' && item.file_type !== 'pdf' && <TextPreview itemId={item.id} />}
+      {item.category === 'document' && item.file_type !== 'pdf' && <TextPreview itemId={item.id} refreshKey={refreshKey} />}
 
       {item.summary && (
         <div style={{ marginTop: 16, padding: 12, background: '#2a2218', borderRadius: 8, border: '1px solid #826f42' }}>

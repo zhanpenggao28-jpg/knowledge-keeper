@@ -1,4 +1,4 @@
-import { Card, Tag, Space, Typography, Dropdown } from 'antd'
+import { Card, Tag, Space, Typography, Dropdown, Checkbox } from 'antd'
 import {
   FileTextOutlined,
   VideoCameraOutlined,
@@ -11,6 +11,7 @@ import {
 import type { Item } from '../../types'
 import { getFileURL, getThumbURL } from '../../services/api'
 import { useState } from 'react'
+import { useAppStore } from '../../stores/appStore'
 
 const { Text } = Typography
 
@@ -39,7 +40,7 @@ function formatSize(bytes: number): string {
 }
 
 const menuItems = (item: Item, onDelete: Props['onDelete'], onReprocess: Props['onReprocess'], onEditTags: Props['onEditTags']) => [
-  { key: 'open', icon: <FolderOpenOutlined />, label: '打开位置', onClick: () => window.electronAPI?.openInExplorer(item.file_path) },
+  { key: 'open', icon: <FolderOpenOutlined />, label: '打开位置', onClick: () => window.electronAPI?.openInExplorer(item.file_path, item.original_path) },
   { key: 'tags', icon: <EditOutlined />, label: '编辑标签', onClick: () => onEditTags(item) },
   { key: 'reprocess', icon: <ReloadOutlined />, label: '重新处理', onClick: () => onReprocess(item.id) },
   { type: 'divider' as const },
@@ -55,6 +56,7 @@ function ThumbContent({ item }: { item: Item }) {
       <img
         src={thumbUrl}
         alt=""
+        draggable={false}
         onError={() => setImgError(true)}
         style={{
           width: '100%',
@@ -74,6 +76,7 @@ function ThumbContent({ item }: { item: Item }) {
       <img
         src={url}
         alt=""
+        draggable={false}
         onError={() => setImgError(true)}
         style={{
           width: '100%',
@@ -121,19 +124,83 @@ function ThumbContent({ item }: { item: Item }) {
 }
 
 export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditTags }: Props) {
+  const { selectedIds, toggleSelect } = useAppStore()
+  const isSelected = selectedIds.has(item.id)
+  const [hovered, setHovered] = useState(false)
+  const showCheck = hovered || isSelected
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('.ant-checkbox, .ant-checkbox-wrapper, .ant-btn, .ant-tag, .ant-dropdown')) return
+
+    const startX = e.clientX
+    const startY = e.clientY
+    let triggered = false
+
+    const onMove = (ev: MouseEvent) => {
+      if (triggered) return
+      if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 3) {
+        triggered = true
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        console.log('[drag] trigger on', item.category, item.file_type)
+        window.electronAPI?.dragFile(item.file_path, item.original_path)
+      }
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   return (
+    <div
+      onMouseDown={handleMouseDown}
+      style={{ height: '100%', cursor: 'grab', userSelect: 'none' as any }}
+    >
     <Dropdown menu={{ items: menuItems(item, onDelete, onReprocess, onEditTags) }} trigger={['contextMenu']}>
       <Card
         hoverable
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
           borderRadius: 8,
           overflow: 'hidden',
           height: '100%',
-          transition: 'all 0.2s'
+          transition: 'all 0.2s',
+          cursor: 'grab',
+          outline: isSelected ? '2px solid #d4b65f' : undefined,
+          outlineOffset: -2
         }}
         styles={{ body: { padding: 8 } }}
         onClick={onClick}
-        cover={<ThumbContent item={item} />}
+        cover={
+          <div style={{ position: 'relative' }}>
+            <ThumbContent item={item} />
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                opacity: showCheck ? 1 : 0,
+                transition: 'opacity 0.15s',
+                background: isSelected ? '#d4b65f' : 'rgba(0,0,0,0.5)',
+                borderRadius: 4,
+                padding: '2px 4px'
+              }}
+            >
+              <Checkbox
+                checked={isSelected}
+                onChange={() => toggleSelect(item.id)}
+                style={{ transform: 'scale(0.85)' }}
+              />
+            </div>
+          </div>
+        }
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <Text strong ellipsis style={{ maxWidth: '100%', textAlign: 'center', fontSize: 13 }}>
@@ -153,5 +220,6 @@ export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditT
         </div>
       </Card>
     </Dropdown>
+    </div>
   )
 }

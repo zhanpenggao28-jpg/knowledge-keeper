@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Row, Col, Statistic, Typography, Space, Button } from 'antd'
 import { FileTextOutlined, PictureOutlined, VideoCameraOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAppStore } from '../stores/appStore'
 import { useItems } from '../hooks/useItems'
 import ItemGrid from '../components/library/ItemGrid'
+import ImportDialog from '../components/library/ImportDialog'
 
 const { Title } = Typography
 
@@ -15,6 +16,7 @@ export default function HomePage() {
   const loadItems = useAppStore(s => s.loadItems)
   const allItems = useAppStore(s => s.items)
   const total = useAppStore(s => s.total)
+  const [importOpen, setImportOpen] = useState(false)
 
   const docCount = allItems.filter(i => i.category === 'document').length
   const imageCount = allItems.filter(i => i.category === 'image').length
@@ -23,13 +25,6 @@ export default function HomePage() {
   useEffect(() => {
     loadItems({ limit: 100 })
   }, [])
-
-  const handleImport = async () => {
-    if (window.electronAPI) {
-      await window.electronAPI.importFiles()
-      refresh()
-    }
-  }
 
   const recent = allItems.slice(0, 6)
 
@@ -45,17 +40,17 @@ export default function HomePage() {
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="文档" value={docCount} prefix={<FileTextOutlined style={{ color: '#1677ff' }} />} />
+            <Statistic title="文档" value={docCount} prefix={<FileTextOutlined style={{ color: '#d4b65f' }} />} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="图片" value={imageCount} prefix={<PictureOutlined style={{ color: '#fa8c16' }} />} />
+            <Statistic title="图片" value={imageCount} prefix={<PictureOutlined style={{ color: '#d4b65f' }} />} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="视频" value={videoCount} prefix={<VideoCameraOutlined style={{ color: '#52c41a' }} />} />
+            <Statistic title="视频" value={videoCount} prefix={<VideoCameraOutlined style={{ color: '#d4b65f' }} />} />
           </Card>
         </Col>
       </Row>
@@ -64,7 +59,7 @@ export default function HomePage() {
         <Title level={5} style={{ margin: 0 }}>最近添加</Title>
         <Space>
           <Button icon={<SearchOutlined />} onClick={() => navigate('/search')}>搜索</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleImport}>导入文件</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setImportOpen(true)}>导入文件</Button>
         </Space>
       </div>
 
@@ -78,6 +73,8 @@ export default function HomePage() {
         onReprocess={async (id) => { await (await import('../services/api')).reprocessItem(id) }}
         onEditTags={() => {}}
       />
+
+      <ImportDialog open={importOpen} onClose={() => { setImportOpen(false); refresh() }} />
     </div>
   )
 }

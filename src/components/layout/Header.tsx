@@ -1,17 +1,13 @@
-import { Button, Space, Badge } from 'antd'
-import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined, FileTextOutlined } from '@ant-design/icons'
+import { useState } from 'react'
+import { Button, Space } from 'antd'
+import { PlusOutlined, AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import SearchBar from '../search/SearchBar'
+import ImportDialog from '../library/ImportDialog'
 import { useAppStore } from '../../stores/appStore'
 
 export default function Header() {
   const { viewMode, setViewMode } = useAppStore()
-
-  const handleImport = async () => {
-    if (window.electronAPI) {
-      await window.electronAPI.importFiles()
-      useAppStore.getState().loadItems()
-    }
-  }
+  const [importOpen, setImportOpen] = useState(false)
 
   return (
     <div
@@ -37,10 +33,12 @@ export default function Header() {
           type={viewMode === 'list' ? 'primary' : 'default'}
           onClick={() => setViewMode('list')}
         />
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleImport}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setImportOpen(true)}>
           导入文件
         </Button>
       </Space>
+
+      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   )
 }

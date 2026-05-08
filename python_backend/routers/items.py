@@ -14,11 +14,15 @@ class ItemCreate(BaseModel):
     filePath: str
     fileSize: int
     fileHash: str
+    originalPath: str | None = None
 
 
 class ItemUpdate(BaseModel):
     title: str | None = None
     tag_ids: list[int] | None = None
+    originalName: str | None = None
+    extractedText: str | None = None
+    fileHash: str | None = None
 
 
 @router.post("")
@@ -26,9 +30,9 @@ def create_item(body: ItemCreate):
     item_id = str(uuid.uuid4())
     with get_db() as db:
         db.execute(
-            """INSERT INTO items (id, title, file_type, category, file_path, original_name, file_size, file_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            [item_id, body.title, body.fileType, body.category, body.filePath, body.originalName, body.fileSize, body.fileHash]
+            """INSERT INTO items (id, title, file_type, category, file_path, original_name, file_size, file_hash, original_path)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [item_id, body.title, body.fileType, body.category, body.filePath, body.originalName, body.fileSize, body.fileHash, body.originalPath]
         )
         db.execute(
             "INSERT INTO processing_jobs (item_id, task_type, priority) VALUES (?, 'text_extract', 10)",
@@ -72,7 +76,7 @@ def list_items(
 
         rows = db.execute(
             f"""SELECT i.id, i.title, i.file_type, i.category, i.file_path,
-                       i.original_name, i.file_size, i.file_hash, i.thumbnail, i.preview,
+                       i.original_name, i.file_size, i.file_hash, i.original_path, i.thumbnail, i.preview,
                        substr(i.extracted_text, 1, 200) as extracted_text,
                        i.summary, i.status, i.error_msg, i.duration, i.page_count,
                        i.created_at, i.updated_at
@@ -135,6 +139,15 @@ def update_item(item_id: str, body: ItemUpdate):
         if body.title is not None:
             db.execute("UPDATE items SET title = ?, updated_at = datetime('now') WHERE id = ?", [body.title, item_id])
 
+        if body.originalName is not None:
+            db.execute("UPDATE items SET original_name = ?, updated_at = datetime('now') WHERE id = ?", [body.originalName, item_id])
+
+        if body.extractedText is not None:
+            db.execute("UPDATE items SET extracted_text = ?, status = 'done', updated_at = datetime('now') WHERE id = ?", [body.extractedText, item_id])
+
+        if body.fileHash is not None:
+            db.execute("UPDATE items SET file_hash = ?, updated_at = datetime('now') WHERE id = ?", [body.fileHash, item_id])
+
         if body.tag_ids is not None:
             db.execute("DELETE FROM item_tags WHERE item_id = ?", [item_id])
             for tag_id in body.tag_ids:
@@ -175,5 +188,22 @@ def reprocess_item(item_id: str):
         db.execute(
             "INSERT INTO processing_jobs (item_id, task_type, priority) VALUES (?, 'thumbnail', 5)",
             [item_id]
+        )
+    return {"ok": True}
+
+
+class RelocateBody(BaseModel):
+    original_path: str
+
+
+@router.put("/{item_id}/relocate")
+def relocate_item(item_id: str, body: RelocateBody):
+    with get_db() as db:
+        existing = db.execute("SELECT * FROM items WHERE id = ?", [item_id]).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="文件不存在")
+        db.execute(
+            "UPDATE items SET original_path = ?, updated_at = datetime('now') WHERE id = ?",
+            [body.original_path, item_id]
         )
     return {"ok": True}

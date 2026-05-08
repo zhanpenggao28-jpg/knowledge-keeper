@@ -6,9 +6,10 @@ const { Paragraph } = Typography
 
 interface Props {
   itemId: string
+  refreshKey: number
 }
 
-export default function TextPreview({ itemId }: Props) {
+export default function TextPreview({ itemId, refreshKey }: Props) {
   const [text, setText] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
@@ -24,7 +25,7 @@ export default function TextPreview({ itemId }: Props) {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [itemId])
+  }, [itemId, refreshKey])
 
   if (loading) return <Skeleton active paragraph={{ rows: 10 }} />
   if (!text) return <Empty description="未能提取到文本内容" />

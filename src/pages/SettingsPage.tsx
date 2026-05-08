@@ -55,6 +55,23 @@ export default function SettingsPage() {
                 <code>{appPaths.userData}</code>
               </Descriptions.Item>
             </Descriptions>
+            <Button
+              style={{ marginTop: 12 }}
+              disabled={!window.electronAPI}
+              onClick={async () => {
+                if (!window.electronAPI) return
+                const dir = await window.electronAPI.selectDirectory()
+                if (!dir) return
+                const result = await window.electronAPI.setStoragePath(dir)
+                if (result.ok) {
+                  message.success('存储路径已更改，请重启应用以生效')
+                } else {
+                  message.error('保存失败')
+                }
+              }}
+            >
+              更改存储位置
+            </Button>
           </Card>
         )}
 
