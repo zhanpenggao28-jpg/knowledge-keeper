@@ -42,6 +42,16 @@ export interface ProcessingJob {
   finished_at: string | null
 }
 
+export interface Collection {
+  id: number
+  name: string
+  description: string
+  color: string
+  item_count: number
+  created_at: string
+  updated_at: string
+}
+
 export interface SearchResult {
   items: Item[]
   total: number

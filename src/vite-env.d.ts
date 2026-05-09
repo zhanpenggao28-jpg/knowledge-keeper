@@ -27,8 +27,10 @@ interface ElectronAPI {
   getSidecarStatus: () => Promise<'starting' | 'running' | 'stopped' | 'error'>
   getSettings: () => Promise<Record<string, unknown>>
   setStoragePath: (path: string) => Promise<{ ok: boolean }>
+  checkFileExists: (filePath: string) => Promise<boolean>
   findFileByHash: (fileHash: string, searchDir: string) => Promise<string | null>
   relocateFile: (itemId: string, originalPath: string) => Promise<{ ok: boolean }>
+  moveFile: (relativePath: string, originalPath: string | null, destDir: string) => Promise<{ success: boolean; newPath?: string; destName?: string }>
   syncFileNames: () => Promise<{ updated: number; nameUpdated: number; contentUpdated: number }>
   onSidecarReady: (callback: (port: number) => void) => () => void
   onImportProgress: (callback: (progress: ImportProgress) => void) => () => void

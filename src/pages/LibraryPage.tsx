@@ -140,7 +140,7 @@ export default function LibraryPage() {
             onChange={e => setSearchInput(e.target.value)}
             allowClear
             size="small"
-            style={{ width: 200 }}
+            style={{ width: 220 }}
           />
         </Space>
         <Space>
@@ -160,7 +160,7 @@ export default function LibraryPage() {
           >
             刷新
           </Button>
-          <span style={{ color: '#999' }}>共 {total} 个文件</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>共 {total} 个文件</span>
         </Space>
       </div>
 
@@ -211,7 +211,7 @@ export default function LibraryPage() {
           onPressEnter={handleRenameConfirm}
           style={{ marginTop: 8 }}
         />
-        <div style={{ marginTop: 8, color: '#888', fontSize: 12 }}>
+        <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
           重命名会同时修改文件夹中的实际文件名
         </div>
       </Modal>

@@ -104,7 +104,7 @@ export default function ImportDialog({ open, onClose }: Props) {
     <Modal
       title={
         <Space>
-          <InboxOutlined style={{ color: '#d4b65f' }} />
+          <InboxOutlined style={{ color: 'var(--accent)' }} />
           导入文件
         </Space>
       }
@@ -235,7 +235,7 @@ export default function ImportDialog({ open, onClose }: Props) {
             <div style={{
               marginTop: 12,
               padding: 8,
-              background: '#1a1a1a',
+              background: 'var(--bg-elevated)',
               borderRadius: 6,
               fontSize: 12
             }}>

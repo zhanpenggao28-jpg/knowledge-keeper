@@ -50,6 +50,7 @@ def list_items(
     category: str | None = Query(None),
     status: str | None = Query(None),
     tag_id: int | None = Query(None),
+    collection_id: int | None = Query(None),
     q: str | None = Query(None),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200)
@@ -57,6 +58,7 @@ def list_items(
     with get_db() as db:
         conditions = []
         params = []
+        joins = []
 
         if category:
             conditions.append("i.category = ?")
@@ -67,16 +69,17 @@ def list_items(
         if tag_id is not None:
             conditions.append("it.tag_id = ?")
             params.append(tag_id)
+            joins.append("JOIN item_tags it ON i.id = it.item_id")
+        if collection_id is not None:
+            conditions.append("ci.collection_id = ?")
+            params.append(collection_id)
+            joins.append("JOIN collection_items ci ON i.id = ci.item_id")
         if q:
             conditions.append("i.title LIKE ?")
             params.append(f"%{q}%")
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
-
-        if tag_id is not None:
-            join_clause = "JOIN item_tags it ON i.id = it.item_id"
-        else:
-            join_clause = ""
+        join_clause = " ".join(joins)
 
         rows = db.execute(
             f"""SELECT i.id, i.title, i.file_type, i.category, i.file_path,

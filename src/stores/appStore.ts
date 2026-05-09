@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Item, Tag } from '../types'
+import type { Item, Tag, Collection } from '../types'
 import * as api from '../services/api'
 
 interface AppState {
@@ -9,18 +9,24 @@ interface AppState {
   selectedIds: Set<string>
   activeCategory: string | null
   activeTagId: number | null
+  activeCollectionId: number | null
   activeSearchQuery: string
   isLoading: boolean
   viewMode: 'grid' | 'list'
   previewOpen: boolean
   refreshKey: number
   tagRefreshKey: number
+  collectionRefreshKey: number
+  collections: Collection[]
   bumpTagRefresh: () => void
+  bumpCollectionRefresh: () => void
 
-  loadItems: (params?: { category?: string; tag_id?: number; q?: string; offset?: number; limit?: number }) => Promise<void>
+  loadItems: (params?: { category?: string; tag_id?: number; collection_id?: number; q?: string; offset?: number; limit?: number }) => Promise<void>
+  loadCollections: () => Promise<void>
   selectItem: (item: Item | null) => void
   setCategory: (category: string | null) => void
   setTagFilter: (tagId: number | null) => void
+  setCollectionFilter: (collectionId: number | null) => void
   setActiveSearchQuery: (q: string) => void
   setViewMode: (mode: 'grid' | 'list') => void
   setPreviewOpen: (open: boolean) => void
@@ -36,13 +42,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedIds: new Set<string>(),
   activeCategory: null,
   activeTagId: null,
+  activeCollectionId: null,
   activeSearchQuery: '',
   isLoading: false,
   viewMode: 'grid',
   previewOpen: false,
   refreshKey: 0,
   tagRefreshKey: 0,
+  collectionRefreshKey: 0,
+  collections: [],
   bumpTagRefresh: () => set({ tagRefreshKey: get().tagRefreshKey + 1 }),
+  bumpCollectionRefresh: () => set({ collectionRefreshKey: get().collectionRefreshKey + 1 }),
 
   loadItems: async (params) => {
     set({ isLoading: true })
@@ -50,6 +60,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const p = {
         category: params?.category ?? get().activeCategory ?? undefined,
         tag_id: params?.tag_id ?? get().activeTagId ?? undefined,
+        collection_id: params?.collection_id ?? get().activeCollectionId ?? undefined,
         q: params?.q ?? (get().activeSearchQuery || undefined),
         offset: params?.offset ?? 0,
         limit: params?.limit ?? 50
@@ -63,6 +74,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadCollections: async () => {
+    try {
+      const data = await api.getCollections()
+      set({ collections: data, collectionRefreshKey: get().collectionRefreshKey + 1 })
+    } catch (err) {
+      console.error('Failed to load collections:', err)
+    }
+  },
+
   selectItem: (item) => set({ selectedItem: item }),
   setCategory: (category) => {
     set({ activeCategory: category })
@@ -70,6 +90,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setTagFilter: (tagId) => {
     set({ activeTagId: tagId })
+    get().loadItems()
+  },
+  setCollectionFilter: (collectionId) => {
+    set({ activeCollectionId: collectionId, activeTagId: null })
     get().loadItems()
   },
   setActiveSearchQuery: (q) => set({ activeSearchQuery: q }),

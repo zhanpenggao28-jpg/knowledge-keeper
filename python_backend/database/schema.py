@@ -67,6 +67,24 @@ CREATE TABLE IF NOT EXISTS item_tags (
 
 CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags(tag_id);
 
+CREATE TABLE IF NOT EXISTS collections (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    description TEXT DEFAULT '',
+    color       TEXT DEFAULT '#888890',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS collection_items (
+    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+    item_id       TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    PRIMARY KEY (collection_id, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_collection_items_col ON collection_items(collection_id);
+CREATE INDEX IF NOT EXISTS idx_collection_items_item ON collection_items(item_id);
+
 CREATE TABLE IF NOT EXISTS processing_jobs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id     TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,

@@ -12,16 +12,19 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       theme={{
         algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#d4b65f',
-          colorInfo: '#d4b65f',
-          colorSuccess: '#7cb85c',
-          colorWarning: '#e6a23c',
-          colorError: '#e05d5d',
-          borderRadius: 8,
-          colorBgContainer: '#1e1e1e',
-          colorBgElevated: '#262626',
-          colorBgLayout: '#141414',
-          colorBorder: '#333333',
+          colorPrimary: '#c8a84e',
+          colorInfo: '#c8a84e',
+          colorSuccess: '#5b9a4b',
+          colorWarning: '#c98a3e',
+          colorError: '#d94a4a',
+          borderRadius: 10,
+          colorBgContainer: '#111113',
+          colorBgElevated: '#18181b',
+          colorBgLayout: '#0a0a0b',
+          colorBorder: '#1f1f24',
+          colorText: '#ededef',
+          colorTextSecondary: '#888890',
+          fontSize: 14,
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
         }
       }}

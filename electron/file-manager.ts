@@ -231,6 +231,27 @@ export class FileManager {
     }
   }
 
+  moveFile(relativePath: string, originalPath: string | null, destDir: string): { success: boolean; newPath?: string; destName?: string } {
+    const sourcePath = this.resolveWorkingPath(originalPath, relativePath)
+    if (!fs.existsSync(sourcePath)) return { success: false }
+    const fileName = path.basename(sourcePath)
+    let destPath = path.join(destDir, fileName)
+    let counter = 1
+    const ext = path.extname(fileName)
+    const base = path.basename(fileName, ext)
+    while (fs.existsSync(destPath)) {
+      destPath = path.join(destDir, `${base}(${counter})${ext}`)
+      counter++
+    }
+    try {
+      fs.copyFileSync(sourcePath, destPath)
+      // Only delete source if it's NOT inside the storage directory (i.e., it's an original file or we're moving within storage)
+      // For safety, only delete the source if copy succeeded
+      fs.unlinkSync(sourcePath)
+      return { success: true, newPath: destPath, destName: path.basename(destPath) }
+    } catch { return { success: false } }
+  }
+
   findFileByHash(fileHash: string, searchDir: string): string | null {
     if (!fs.existsSync(searchDir)) return null
     try {

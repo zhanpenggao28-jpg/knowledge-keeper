@@ -20,10 +20,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSidecarStatus: () => ipcRenderer.invoke('get-sidecar-status'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setStoragePath: (path: string) => ipcRenderer.invoke('set-storage-path', path),
+  checkFileExists: (filePath: string) =>
+    ipcRenderer.invoke('check-file-exists', filePath),
   findFileByHash: (fileHash: string, searchDir: string) =>
     ipcRenderer.invoke('find-file-by-hash', fileHash, searchDir),
   relocateFile: (itemId: string, originalPath: string) =>
     ipcRenderer.invoke('relocate-file', itemId, originalPath),
+  moveFile: (relativePath: string, originalPath: string | null, destDir: string) =>
+    ipcRenderer.invoke('move-file', relativePath, originalPath, destDir),
   syncFileNames: () => ipcRenderer.invoke('sync-file-names'),
 
   onSidecarReady: (callback: (port: number) => void) => {

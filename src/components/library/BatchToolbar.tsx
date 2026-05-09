@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Button, Space, Typography, App } from 'antd'
-import { DeleteOutlined, ExportOutlined, CloseOutlined, SelectOutlined, TagsOutlined } from '@ant-design/icons'
+import { DeleteOutlined, ExportOutlined, CloseOutlined, SelectOutlined, TagsOutlined, FolderOpenOutlined, PlusOutlined } from '@ant-design/icons'
 import { useAppStore } from '../../stores/appStore'
-import { deleteItem, updateItem } from '../../services/api'
+import { deleteItem, updateItem, addItemsToCollection } from '../../services/api'
 import TagManager from '../tags/TagManager'
+import CollectionManager from './CollectionManager'
 
 const { Text } = Typography
 
@@ -12,9 +13,10 @@ interface Props {
 }
 
 export default function BatchToolbar({ onRefresh }: Props) {
-  const { selectedIds, clearSelection, selectAll, items } = useAppStore()
+  const { selectedIds, clearSelection, selectAll, items, collections, loadCollections, bumpCollectionRefresh } = useAppStore()
   const { message, modal } = App.useApp()
   const [tagOpen, setTagOpen] = useState(false)
+  const [collOpen, setCollOpen] = useState(false)
 
   const count = selectedIds.size
   if (count === 0) return null
@@ -59,6 +61,25 @@ export default function BatchToolbar({ onRefresh }: Props) {
     selectAll(items.map(i => i.id))
   }
 
+  const handleMove = async () => {
+    if (!window.electronAPI) return
+    const dir = await window.electronAPI.selectDirectory()
+    if (!dir) return
+    const ids = Array.from(selectedIds)
+    const selected = items.filter(i => ids.includes(i.id))
+    let done = 0
+    for (const item of selected) {
+      const result = await window.electronAPI.moveFile(item.file_path, item.original_path, dir)
+      if (result.success && result.newPath) {
+        await window.electronAPI.relocateFile(item.id, result.newPath)
+        done++
+      }
+    }
+    message.success(`已移动 ${done} 个文件`)
+    clearSelection()
+    onRefresh()
+  }
+
   const handleBatchTag = async (tag: { id: number }) => {
     const ids = Array.from(selectedIds)
     const selected = items.filter(i => ids.includes(i.id))
@@ -75,7 +96,13 @@ export default function BatchToolbar({ onRefresh }: Props) {
     onRefresh()
   }
 
-  // Compute which tags are common to ALL selected items
+  const handleAddToCollection = async (collectionId: number) => {
+    const ids = Array.from(selectedIds)
+    await addItemsToCollection(collectionId, ids)
+    message.success(`已添加 ${ids.length} 个文件到收藏集`)
+    bumpCollectionRefresh()
+    loadCollections()
+  }
   const selectedItems = items.filter(i => selectedIds.has(i.id))
   const commonTagIds = selectedItems.length > 0
     ? selectedItems[0].tags?.map(t => t.id).filter(tid =>
@@ -91,16 +118,16 @@ export default function BatchToolbar({ onRefresh }: Props) {
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 1000,
-        background: '#2a2218',
-        border: '1px solid #826f42',
-        borderRadius: 12,
-        padding: '8px 20px',
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '10px 22px',
         display: 'flex',
         alignItems: 'center',
         gap: 16,
-        boxShadow: '0 4px 24px rgba(0,0,0,0.5)'
+        boxShadow: 'var(--shadow-md)'
       }}>
-        <Text style={{ color: '#d4b65f', fontWeight: 600 }}>
+        <Text style={{ color: 'var(--accent)', fontWeight: 600 }}>
           已选 {count} 项
         </Text>
 
@@ -110,6 +137,12 @@ export default function BatchToolbar({ onRefresh }: Props) {
           </Button>
           <Button size="small" icon={<TagsOutlined />} onClick={() => setTagOpen(true)}>
             标签
+          </Button>
+          <Button size="small" icon={<PlusOutlined />} onClick={() => { loadCollections(); setCollOpen(true) }}>
+            收藏集
+          </Button>
+          <Button size="small" icon={<FolderOpenOutlined />} onClick={handleMove}>
+            移动到
           </Button>
           <Button
             size="small"
@@ -142,6 +175,11 @@ export default function BatchToolbar({ onRefresh }: Props) {
         onClose={() => setTagOpen(false)}
         onSelectTag={handleBatchTag}
         selectedTagIds={commonTagIds}
+      />
+      <CollectionManager
+        open={collOpen}
+        onClose={() => setCollOpen(false)}
+        onSelectCollection={(c) => { handleAddToCollection(c.id); setCollOpen(false) }}
       />
     </>
   )

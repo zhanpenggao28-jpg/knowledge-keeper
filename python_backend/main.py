@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from database.engine import init_db
-from routers import items, search, tags, processing
+from routers import items, search, tags, processing, collections
 from workers.processor import run_processor
 import config
 import os
@@ -42,6 +42,7 @@ app.include_router(items.router)
 app.include_router(search.router)
 app.include_router(tags.router)
 app.include_router(processing.router)
+app.include_router(collections.router)
 
 
 @app.get("/health")

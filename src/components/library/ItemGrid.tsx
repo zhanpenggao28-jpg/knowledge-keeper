@@ -192,8 +192,8 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
         style={{
           display: 'none',
           position: 'absolute',
-          background: selecting ? 'rgba(212, 182, 95, 0.12)' : 'transparent',
-          border: selecting ? '1px dashed #d4b65f' : 'none',
+          background: selecting ? 'rgba(200, 168, 78, 0.12)' : 'transparent',
+          border: selecting ? '1px dashed var(--accent)' : 'none',
           pointerEvents: 'none',
           zIndex: 10
         }}

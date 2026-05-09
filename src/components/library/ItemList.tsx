@@ -1,12 +1,13 @@
-import { Table, Tag, Space, Typography, Button, Empty, Checkbox } from 'antd'
+import { Table, Tag, Space, Typography, Button, Empty, Checkbox, Dropdown } from 'antd'
 import {
   FolderOpenOutlined, ReloadOutlined, DeleteOutlined, EditOutlined,
-  FileTextOutlined, VideoCameraOutlined, PictureOutlined
+  FileTextOutlined, VideoCameraOutlined, PictureOutlined, PlusOutlined
 } from '@ant-design/icons'
 import type { Item } from '../../types'
-import { getFileURL, getThumbURL } from '../../services/api'
-import { useState } from 'react'
+import { getFileURL, getThumbURL, addItemsToCollection } from '../../services/api'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import CollectionManager from './CollectionManager'
 import dayjs from 'dayjs'
 
 const { Text } = Typography
@@ -33,18 +34,18 @@ function ThumbIcon({ item }: { item: Item }) {
   if (thumbUrl && !imgError) {
     return (
       <img src={thumbUrl} alt="" draggable={false} onError={() => setImgError(true)}
-        style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 4 }} />
+        style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 6 }} />
     )
   }
 
   if (item.category === 'image' && !imgError) {
     return (
       <img src={getFileURL(item.file_path)} alt="" draggable={false} onError={() => setImgError(true)}
-        style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 4 }} />
+        style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 6 }} />
     )
   }
 
-  const iconStyle = { fontSize: 20, color: '#d4b65f' }
+  const iconStyle = { fontSize: 20, color: 'var(--accent)' }
   switch (item.category) {
     case 'video': return <VideoCameraOutlined style={iconStyle} />
     case 'image': return <PictureOutlined style={iconStyle} />
@@ -52,8 +53,68 @@ function ThumbIcon({ item }: { item: Item }) {
   }
 }
 
+function OriginalDot({ item, refreshKey }: { item: Item; refreshKey: number }) {
+  const [missing, setMissing] = useState(false)
+  useEffect(() => {
+    if (item.original_path && window.electronAPI) {
+      window.electronAPI.checkFileExists(item.original_path).then(exists => setMissing(!exists))
+    } else {
+      setMissing(false)
+    }
+  }, [item.original_path, refreshKey])
+  if (!missing) return null
+  return (
+    <span
+      title="原始文件已移动或删除，当前使用备份"
+      style={{
+        display: 'inline-block',
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        background: '#c98a3e',
+        marginRight: 4,
+        verticalAlign: 'middle'
+      }}
+    />
+  )
+}
+
+async function handleRelocateItem(item: Item) {
+  if (!window.electronAPI || !item.file_hash) return
+  const searchDir = item.original_path
+    ? item.original_path.substring(0, item.original_path.lastIndexOf('\\') + 1) || item.original_path
+    : ''
+  const found = await window.electronAPI.findFileByHash(item.file_hash, searchDir)
+  if (found) {
+    await window.electronAPI.relocateFile(item.id, found)
+  } else {
+    alert('未找到匹配文件')
+  }
+}
+
+async function handleMoveItem(item: Item) {
+  if (!window.electronAPI) return
+  const dir = await window.electronAPI.selectDirectory()
+  if (!dir) return
+  const result = await window.electronAPI.moveFile(item.file_path, item.original_path, dir)
+  if (result.success && result.newPath) {
+    await window.electronAPI.relocateFile(item.id, result.newPath)
+    useAppStore.getState().loadItems()
+  }
+}
+
 export default function ItemList({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
-  const { selectedIds, toggleSelect, selectAll, clearSelection } = useAppStore()
+  const { selectedIds, toggleSelect, selectAll, clearSelection, refreshKey, collections, loadCollections } = useAppStore()
+  const [collOpen, setCollOpen] = useState(false)
+  const [activeItem, setActiveItem] = useState<Item | null>(null)
+
+  useEffect(() => { loadCollections() }, [])
+
+  const handleAddToCollection = async (item: Item, collectionId: number) => {
+    await addItemsToCollection(collectionId, [item.id])
+    useAppStore.getState().bumpCollectionRefresh()
+    loadCollections()
+  }
 
   if (items.length === 0) {
     return <Empty description="还没有文件" />
@@ -93,6 +154,7 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
       key: 'title',
       render: (_: any, record: Item) => (
         <Space>
+          <OriginalDot item={record} refreshKey={refreshKey} />
           <a onClick={() => onItemClick(record)}>
             {record.title || record.original_name}
           </a>
@@ -143,13 +205,38 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
     {
       title: '操作',
       key: 'actions',
-      width: 180,
+      width: 210,
       render: (_: any, record: Item) => (
         <Space size="small">
           <Button size="small" onClick={() => onRename(record)}>重命名</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => onEditTags(record)}>标签</Button>
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: [
+                ...collections.map(c => ({
+                  key: `col-${c.id}`,
+                  label: (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 3, background: c.color, display: 'inline-block' }} />
+                      {c.name}
+                    </span>
+                  ),
+                  onClick: () => handleAddToCollection(record, c.id)
+                })),
+                { type: 'divider' as const },
+                { key: 'new', icon: <PlusOutlined />, label: '新建收藏集...', onClick: () => { setActiveItem(record); setCollOpen(true) } }
+              ]
+            }}
+          >
+            <Button size="small">收藏集</Button>
+          </Dropdown>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => onReprocess(record.id)} />
           <Button size="small" icon={<FolderOpenOutlined />} onClick={() => window.electronAPI?.openInExplorer(record.file_path, record.original_path)} />
+          <Button size="small" onClick={() => handleMoveItem(record)}>移动到</Button>
+          {record.original_path && record.file_hash && (
+            <Button size="small" icon={<ReloadOutlined />} title="重新定位原始文件" onClick={() => handleRelocateItem(record)} />
+          )}
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => onDelete(record.id)} />
         </Space>
       )
@@ -157,6 +244,7 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
   ]
 
   return (
+    <>
     <Table
       dataSource={items}
       columns={columns}
@@ -165,41 +253,26 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
       size="middle"
       onRow={(record) => ({
         onClick: () => onItemClick(record),
-        onMouseDown: (e: React.MouseEvent) => {
-          if (e.button !== 0) return
-          const target = e.target as HTMLElement
-          if (target.closest('.ant-checkbox, .ant-checkbox-wrapper, .ant-btn, .ant-tag, .ant-dropdown')) return
-
-          const startX = e.clientX
-          const startY = e.clientY
-          let triggered = false
-
-          const onMove = (ev: MouseEvent) => {
-            if (triggered) return
-            if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 3) {
-              triggered = true
-              document.removeEventListener('mousemove', onMove)
-              document.removeEventListener('mouseup', onUp)
-              console.log('[drag-list] trigger on', record.category, record.file_type)
-              const state = useAppStore.getState()
-              if (state.selectedIds.has(record.id) && state.selectedIds.size > 1) {
-                const selectedItems = state.items.filter(i => state.selectedIds.has(i.id))
-                const entries = selectedItems.map(i => ({ relativePath: i.file_path, originalPath: i.original_path }))
-                window.electronAPI?.dragFiles(entries)
-              } else {
-                window.electronAPI?.dragFile(record.file_path, record.original_path)
-              }
-            }
-          }
-          const onUp = () => {
-            document.removeEventListener('mousemove', onMove)
-            document.removeEventListener('mouseup', onUp)
-          }
-          document.addEventListener('mousemove', onMove)
-          document.addEventListener('mouseup', onUp)
+        draggable: true,
+        onDragStart: (e: React.DragEvent) => {
+          const state = useAppStore.getState()
+          const ids = state.selectedIds.has(record.id) && state.selectedIds.size > 1
+            ? Array.from(state.selectedIds)
+            : [record.id]
+          e.dataTransfer.setData('application/x-item-ids', JSON.stringify(ids))
+          e.dataTransfer.effectAllowed = 'move'
         },
         style: { cursor: 'grab', userSelect: 'none' as const }
       })}
     />
+    <CollectionManager
+      open={collOpen}
+      onClose={() => { setCollOpen(false); loadCollections() }}
+      onSelectCollection={(c) => {
+        if (activeItem) handleAddToCollection(activeItem, c.id)
+        setCollOpen(false)
+      }}
+    />
+    </>
   )
 }

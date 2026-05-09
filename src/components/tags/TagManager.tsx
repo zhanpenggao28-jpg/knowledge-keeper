@@ -146,7 +146,7 @@ export default function TagManager({ open, onClose, onSelectTag, selectedTagIds 
                     <span>{tag.name}</span>
                     {tag.is_ai_generated ? <span style={{ fontSize: 11, color: '#999' }}>AI</span> : null}
                     <span style={{ color: '#999', fontSize: 12 }}>({tag.item_count ?? 0})</span>
-                    {isSelected && <span style={{ color: '#d4b65f', fontSize: 12 }}>✓ 已选</span>}
+                    {isSelected && <span style={{ color: 'var(--accent)', fontSize: 12 }}>✓ 已选</span>}
                   </Space>
                 )}
               </List.Item>

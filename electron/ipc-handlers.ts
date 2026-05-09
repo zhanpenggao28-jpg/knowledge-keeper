@@ -142,6 +142,14 @@ export function registerIpcHandlers(
     return { ok }
   })
 
+  ipcMain.handle('check-file-exists', async (_event, filePath: string) => {
+    return require('fs').existsSync(filePath)
+  })
+
+  ipcMain.handle('move-file', async (_event, relativePath: string, originalPath: string | null, destDir: string) => {
+    return fileManager.moveFile(relativePath, originalPath, destDir)
+  })
+
   ipcMain.handle('find-file-by-hash', async (_event, fileHash: string, searchDir: string) => {
     return fileManager.findFileByHash(fileHash, searchDir)
   })

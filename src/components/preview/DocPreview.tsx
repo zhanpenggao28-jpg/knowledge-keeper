@@ -19,7 +19,7 @@ export default function DocPreview({ filePath, preview }: Props) {
         position: 'relative',
         width: '100%',
         height: 400,
-        background: '#1a1a1a',
+        background: 'var(--bg-elevated)',
         borderRadius: 8,
         display: 'flex',
         alignItems: 'center',

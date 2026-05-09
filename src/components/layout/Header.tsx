@@ -11,12 +11,13 @@ export default function Header() {
   return (
     <div
       style={{
-        height: 56,
-        borderBottom: '1px solid var(--border-color)',
+        height: 52,
+        borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 24px',
-        gap: 16
+        padding: '0 20px',
+        gap: 12,
+        background: 'var(--bg-surface)'
       }}
     >
       <Space>

@@ -50,12 +50,41 @@ export async function getItems(params?: {
   category?: string
   status?: string
   tag_id?: number
+  collection_id?: number
   q?: string
   offset?: number
   limit?: number
 }): Promise<{ items: Item[]; total: number }> {
   const { data } = await api.get('/items', { params })
   return data
+}
+
+// --- Collections ---
+
+export async function getCollections(): Promise<import('../types').Collection[]> {
+  const { data } = await api.get('/collections')
+  return data
+}
+
+export async function createCollection(body: { name: string; description?: string; color?: string }): Promise<import('../types').Collection> {
+  const { data } = await api.post('/collections', body)
+  return data
+}
+
+export async function updateCollection(id: number, body: { name?: string; description?: string; color?: string }): Promise<void> {
+  await api.put(`/collections/${id}`, body)
+}
+
+export async function deleteCollection(id: number): Promise<void> {
+  await api.delete(`/collections/${id}`)
+}
+
+export async function addItemsToCollection(collectionId: number, itemIds: string[]): Promise<void> {
+  await api.post(`/collections/${collectionId}/items`, { item_ids: itemIds })
+}
+
+export async function removeItemsFromCollection(collectionId: number, itemIds: string[]): Promise<void> {
+  await api.delete(`/collections/${collectionId}/items`, { data: { item_ids: itemIds } })
 }
 
 export async function getItem(id: string): Promise<Item> {

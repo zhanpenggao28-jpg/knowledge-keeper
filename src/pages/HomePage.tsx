@@ -32,23 +32,23 @@ export default function HomePage() {
 
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Card>
+          <Card style={{ borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
             <Statistic title="文件总数" value={total} prefix={<FileTextOutlined />} />
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic title="文档" value={docCount} prefix={<FileTextOutlined style={{ color: '#d4b65f' }} />} />
+          <Card style={{ borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+            <Statistic title="文档" value={docCount} prefix={<FileTextOutlined style={{ color: 'var(--accent)' }} />} />
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic title="图片" value={imageCount} prefix={<PictureOutlined style={{ color: '#d4b65f' }} />} />
+          <Card style={{ borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+            <Statistic title="图片" value={imageCount} prefix={<PictureOutlined style={{ color: 'var(--accent)' }} />} />
           </Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic title="视频" value={videoCount} prefix={<VideoCameraOutlined style={{ color: '#d4b65f' }} />} />
+          <Card style={{ borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+            <Statistic title="视频" value={videoCount} prefix={<VideoCameraOutlined style={{ color: 'var(--accent)' }} />} />
           </Card>
         </Col>
       </Row>
