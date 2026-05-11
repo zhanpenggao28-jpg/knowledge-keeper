@@ -1,5 +1,6 @@
 import { ChildProcess, spawn } from 'child_process'
 import path from 'path'
+import fs from 'fs'
 import http from 'http'
 
 export class SidecarManager {
@@ -28,13 +29,24 @@ export class SidecarManager {
     if (this.status === 'running' || this.status === 'starting') return
 
     this.status = 'starting'
-    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
 
-    this.process = spawn(pythonCmd, ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '0'], {
-      cwd: this.backendDir,
-      env: { ...process.env, PYTHONUNBUFFERED: '1', KK_DATA_DIR: this.storagePath },
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
+    // In production, electron-builder places backend.exe in resources/backend/
+    const bundledExe = path.join(process.resourcesPath, 'backend', 'backend.exe')
+    const isPackaged = process.env.VITE_DEV_SERVER_URL === undefined
+
+    if (isPackaged && fs.existsSync(bundledExe)) {
+      this.process = spawn(bundledExe, [], {
+        env: { ...process.env, KK_DATA_DIR: this.storagePath },
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+    } else {
+      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
+      this.process = spawn(pythonCmd, ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '0'], {
+        cwd: this.backendDir,
+        env: { ...process.env, PYTHONUNBUFFERED: '1', KK_DATA_DIR: this.storagePath },
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+    }
 
     this.port = await this.readPortFromStdout()
 

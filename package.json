@@ -5,9 +5,38 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build:python": "pyinstaller --onedir --distpath python_backend/dist --name backend python_backend/run.py",
+    "build:app": "tsc --noEmit && vite build && electron-builder",
+    "build:dist": "npm run build:python && npm run build:app",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx"
+  },
+  "build": {
+    "appId": "com.knowledge-keeper.app",
+    "productName": "知识管家",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python_backend/dist/backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "知识管家"
+    }
   },
   "dependencies": {
     "antd": "^5.22.0",

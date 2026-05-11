@@ -8,3 +8,6 @@ __pycache__/
 .venv/
 *.egg-info/
 .claude/
+build/
+release/
+*.spec
