@@ -14,6 +14,7 @@ interface ImportFileOptions {
 }
 
 interface ElectronAPI {
+  getFilePath: (file: File) => string
   selectFiles: () => Promise<string[]>
   selectDirectory: () => Promise<string | null>
   importFiles: (options: ImportFileOptions) => Promise<any[]>
@@ -31,9 +32,11 @@ interface ElectronAPI {
   findFileByHash: (fileHash: string, searchDir: string) => Promise<string | null>
   relocateFile: (itemId: string, originalPath: string) => Promise<{ ok: boolean }>
   moveFile: (relativePath: string, originalPath: string | null, destDir: string) => Promise<{ success: boolean; newPath?: string; destName?: string }>
+  deleteFile: (relativePath: string, originalPath?: string | null) => Promise<void>
   syncFileNames: () => Promise<{ updated: number; nameUpdated: number; contentUpdated: number }>
   onSidecarReady: (callback: (port: number) => void) => () => void
   onImportProgress: (callback: (progress: ImportProgress) => void) => () => void
+  onDropImportComplete: (callback: (result: { count: number; error?: string }) => void) => () => void
 }
 
 export {}

@@ -1,11 +1,11 @@
-import { Table, Tag, Space, Typography, Button, Empty, Checkbox, Dropdown } from 'antd'
+import { Table, Tag, Space, Typography, Button, Empty, Checkbox, Dropdown, Input } from 'antd'
 import {
   FolderOpenOutlined, ReloadOutlined, DeleteOutlined, EditOutlined,
   FileTextOutlined, VideoCameraOutlined, PictureOutlined, PlusOutlined
 } from '@ant-design/icons'
 import type { Item } from '../../types'
 import { getFileURL, getThumbURL, addItemsToCollection } from '../../services/api'
-import { useState, useEffect } from 'react'
+import { memo, useState, useEffect, useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import CollectionManager from './CollectionManager'
 import dayjs from 'dayjs'
@@ -19,6 +19,7 @@ interface Props {
   onReprocess: (id: string) => void
   onEditTags: (item: Item) => void
   onRename: (item: Item) => void
+  onRenameSubmit?: (item: Item, newName: string) => Promise<boolean>
 }
 
 function formatSize(bytes: number): string {
@@ -27,7 +28,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function ThumbIcon({ item }: { item: Item }) {
+const ThumbIcon = memo(function ThumbIcon({ item }: { item: Item }) {
   const [imgError, setImgError] = useState(false)
   const thumbUrl = getThumbURL(item.file_path, item.thumbnail)
 
@@ -51,9 +52,9 @@ function ThumbIcon({ item }: { item: Item }) {
     case 'image': return <PictureOutlined style={iconStyle} />
     default: return <FileTextOutlined style={iconStyle} />
   }
-}
+})
 
-function OriginalDot({ item, refreshKey }: { item: Item; refreshKey: number }) {
+const OriginalDot = memo(function OriginalDot({ item }: { item: Item }) {
   const [missing, setMissing] = useState(false)
   useEffect(() => {
     if (item.original_path && window.electronAPI) {
@@ -61,7 +62,7 @@ function OriginalDot({ item, refreshKey }: { item: Item; refreshKey: number }) {
     } else {
       setMissing(false)
     }
-  }, [item.original_path, refreshKey])
+  }, [item.original_path])
   if (!missing) return null
   return (
     <span
@@ -77,7 +78,7 @@ function OriginalDot({ item, refreshKey }: { item: Item; refreshKey: number }) {
       }}
     />
   )
-}
+})
 
 async function handleRelocateItem(item: Item) {
   if (!window.electronAPI || !item.file_hash) return
@@ -103,17 +104,74 @@ async function handleMoveItem(item: Item) {
   }
 }
 
-export default function ItemList({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
-  const { selectedIds, toggleSelect, selectAll, clearSelection, refreshKey, collections, loadCollections } = useAppStore()
+const EditableCellName = memo(function EditableCellName({ item, onItemClick, onRenameSubmit, onRename }: {
+  item: Item
+  onItemClick: (item: Item) => void
+  onRenameSubmit?: (item: Item, newName: string) => Promise<boolean>
+  onRename: (item: Item) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    const trimmed = value.trim()
+    if (!trimmed || trimmed === item.original_name) {
+      setEditing(false); return
+    }
+    if (onRenameSubmit) {
+      setSubmitting(true)
+      try {
+        const ok = await onRenameSubmit(item, trimmed)
+        if (ok) setEditing(false)
+      } finally { setSubmitting(false) }
+    } else {
+      onRename(item)
+      setEditing(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <Input
+        size="small"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onPressEnter={handleSubmit}
+        onBlur={() => setTimeout(() => { if (editing) setEditing(false) }, 150)}
+        onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setEditing(false) } }}
+        disabled={submitting}
+        autoFocus
+        style={{ width: 200 }}
+        onClick={e => e.stopPropagation()}
+      />
+    )
+  }
+
+  return (
+    <a
+      onClick={() => onItemClick(item)}
+      onDoubleClick={e => { e.stopPropagation(); setEditing(true); setValue(item.original_name) }}
+      title={`双击重命名\n${item.original_path || item.file_path}`}
+    >
+      {item.title || item.original_name}
+    </a>
+  )
+})
+
+export default function ItemList({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename, onRenameSubmit }: Props) {
+  const selectedIds = useAppStore(s => s.selectedIds)
+  const toggleSelect = useAppStore(s => s.toggleSelect)
+  const selectAll = useAppStore(s => s.selectAll)
+  const clearSelection = useAppStore(s => s.clearSelection)
+  const collections = useAppStore(s => s.collections)
   const [collOpen, setCollOpen] = useState(false)
   const [activeItem, setActiveItem] = useState<Item | null>(null)
-
-  useEffect(() => { loadCollections() }, [])
 
   const handleAddToCollection = async (item: Item, collectionId: number) => {
     await addItemsToCollection(collectionId, [item.id])
     useAppStore.getState().bumpCollectionRefresh()
-    loadCollections()
+    useAppStore.getState().loadCollections()
   }
 
   if (items.length === 0) {
@@ -154,13 +212,50 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
       key: 'title',
       render: (_: any, record: Item) => (
         <Space>
-          <OriginalDot item={record} refreshKey={refreshKey} />
-          <a onClick={() => onItemClick(record)}>
-            {record.title || record.original_name}
-          </a>
+          <OriginalDot item={record} />
+          <EditableCellName
+            item={record}
+            onItemClick={onItemClick}
+            onRenameSubmit={onRenameSubmit}
+            onRename={onRename}
+          />
           <Tag>{record.file_type.toUpperCase()}</Tag>
+        </Space>
+      )
+    },
+    {
+      title: '收藏集',
+      key: 'collections',
+      width: 140,
+      render: (_: any, record: Item) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          {(record.collections || []).map(c => (
+            <span key={c.id} style={{
+              fontSize: 11, lineHeight: '20px', padding: '0 6px',
+              borderRadius: 3, background: '#fafafa',
+              color: 'var(--text-secondary)',
+              borderLeft: `3px solid ${c.color}`,
+              borderTop: '1px solid var(--border)',
+              borderRight: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border)',
+              whiteSpace: 'nowrap',
+              fontWeight: 500
+            }}>
+              <FolderOpenOutlined style={{ fontSize: 11, marginRight: 3, color: c.color }} />
+              {c.name}
+            </span>
+          ))}
+        </div>
+      )
+    },
+    {
+      title: '标签',
+      key: 'tags',
+      width: 120,
+      render: (_: any, record: Item) => (
+        <Space size={2} wrap>
           {record.tags?.map(t => (
-            <Tag key={t.id} color={t.color}>{t.name}</Tag>
+            <Tag key={t.id} color={t.color} style={{ fontSize: 11, margin: 0, borderRadius: 10 }}>{t.name}{t.is_ai_generated ? ' ·AI' : ''}</Tag>
           ))}
         </Space>
       )
@@ -253,21 +348,26 @@ export default function ItemList({ items, onItemClick, onDelete, onReprocess, on
       size="middle"
       onRow={(record) => ({
         onClick: () => onItemClick(record),
-        draggable: true,
         onDragStart: (e: React.DragEvent) => {
           const state = useAppStore.getState()
-          const ids = state.selectedIds.has(record.id) && state.selectedIds.size > 1
-            ? Array.from(state.selectedIds)
-            : [record.id]
+          const isSelected = state.selectedIds.has(record.id)
+          let ids: string[]
+          if (isSelected && state.selectedIds.size > 1) {
+            ids = state.items.filter(i => state.selectedIds.has(i.id)).map(i => i.id)
+          } else {
+            ids = [record.id]
+          }
+          state.setDraggedItemIds(ids)
           e.dataTransfer.setData('application/x-item-ids', JSON.stringify(ids))
           e.dataTransfer.effectAllowed = 'move'
         },
+        draggable: true as any,
         style: { cursor: 'grab', userSelect: 'none' as const }
       })}
     />
     <CollectionManager
       open={collOpen}
-      onClose={() => { setCollOpen(false); loadCollections() }}
+      onClose={() => { setCollOpen(false); useAppStore.getState().loadCollections() }}
       onSelectCollection={(c) => {
         if (activeItem) handleAddToCollection(activeItem, c.id)
         setCollOpen(false)

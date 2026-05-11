@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback, memo } from 'react'
 import { Row, Col, Empty } from 'antd'
 import type { Item } from '../../types'
 import { useAppStore } from '../../stores/appStore'
@@ -11,6 +11,7 @@ interface Props {
   onReprocess: (id: string) => void
   onEditTags: (item: Item) => void
   onRename: (item: Item) => void
+  onRenameSubmit?: (item: Item, newName: string) => Promise<boolean>
 }
 
 const ZOOM_LEVELS = [
@@ -23,7 +24,7 @@ const ZOOM_LEVELS = [
   { xl: 24, lg: 24, md: 24, sm: 24, xs: 24 }, // 6: xx-large
 ]
 
-export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
+const ItemGrid = memo(function ItemGrid({ items, onItemClick, onDelete, onReprocess, onEditTags, onRename, onRenameSubmit }: Props) {
   const gridRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number>(0)
@@ -36,7 +37,8 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
 
-  const { selectedIds, toggleSelect, selectAll, clearSelection } = useAppStore()
+  const toggleSelect = useAppStore(s => s.toggleSelect)
+  const clearSelection = useAppStore(s => s.clearSelection)
 
   // ---- Alt + wheel zoom ----
   const handleWheel = useCallback((e: WheelEvent) => {
@@ -136,6 +138,7 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
     }
 
     const cards = grid.querySelectorAll<HTMLElement>('[data-item-id]')
+    const selectedIds = useAppStore.getState().selectedIds
     cards.forEach(el => {
       const cr = el.getBoundingClientRect()
       // Rectangle intersection: select if the box touches any part of the card
@@ -144,11 +147,7 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
         const id = el.getAttribute('data-item-id')
         if (id) {
           const isSelected = selectedIds.has(id)
-          if (e.ctrlKey || e.metaKey) {
-            if (!isSelected) toggleSelect(id)
-          } else {
-            if (!isSelected) toggleSelect(id)
-          }
+          if (!isSelected) toggleSelect(id)
         }
       }
     })
@@ -180,6 +179,7 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
                 onReprocess={onReprocess}
                 onEditTags={onEditTags}
                 onRename={onRename}
+                onRenameSubmit={onRenameSubmit}
               />
             </div>
           </Col>
@@ -200,4 +200,6 @@ export default function ItemGrid({ items, onItemClick, onDelete, onReprocess, on
       />
     </div>
   )
-}
+})
+
+export default ItemGrid

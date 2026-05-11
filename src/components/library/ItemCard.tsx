@@ -1,4 +1,4 @@
-import { Card, Tag, Space, Typography, Dropdown, Checkbox } from 'antd'
+import { Card, Tag, Space, Typography, Dropdown, Checkbox, Input } from 'antd'
 import {
   FileTextOutlined,
   VideoCameraOutlined,
@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons'
 import type { Item } from '../../types'
 import { getFileURL, getThumbURL, addItemsToCollection } from '../../services/api'
-import { useState, useEffect } from 'react'
+import { memo, useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import CollectionManager from './CollectionManager'
 
@@ -24,6 +24,7 @@ interface Props {
   onReprocess: (id: string) => void
   onEditTags: (item: Item) => void
   onRename: (item: Item) => void
+  onRenameSubmit?: (item: Item, newName: string) => Promise<boolean>
 }
 
 const ICON_COLOR = 'var(--accent)'
@@ -79,7 +80,7 @@ const menuItems = (item: Item, onDelete: Props['onDelete'], onReprocess: Props['
   return items
 }
 
-function ThumbContent({ item }: { item: Item }) {
+const ThumbContent = memo(function ThumbContent({ item }: { item: Item }) {
   const [imgError, setImgError] = useState(false)
   const thumbUrl = getThumbURL(item.file_path, item.thumbnail)
 
@@ -151,30 +152,63 @@ function ThumbContent({ item }: { item: Item }) {
       {getIcon(item.category, 40)}
     </div>
   )
-}
+})
 
-export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditTags, onRename }: Props) {
-  const { selectedIds, toggleSelect } = useAppStore()
-  const isSelected = selectedIds.has(item.id)
+const ItemCard = memo(function ItemCard({ item, onClick, onDelete, onReprocess, onEditTags, onRename, onRenameSubmit }: Props) {
+  const isSelected = useAppStore(s => s.selectedIds.has(item.id))
+  const toggleSelect = useAppStore(s => s.toggleSelect)
+  const collections = useAppStore(s => s.collections)
   const [hovered, setHovered] = useState(false)
   const showCheck = hovered || isSelected
-  const refreshKey = useAppStore(s => s.refreshKey)
-  const collections = useAppStore(s => s.collections)
-  const loadCollections = useAppStore(s => s.loadCollections)
+  const checkedRef = useRef(false)
   const [originalMissing, setOriginalMissing] = useState(false)
   const [collOpen, setCollOpen] = useState(false)
+  const [inlineEditing, setInlineEditing] = useState(false)
+  const [inlineValue, setInlineValue] = useState('')
+  const [inlineSubmitting, setInlineSubmitting] = useState(false)
+
+  const handleInlineStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setInlineEditing(true)
+    setInlineValue(item.original_name)
+  }
+
+  const handleInlineSubmit = async () => {
+    const trimmed = inlineValue.trim()
+    if (!trimmed || trimmed === item.original_name) {
+      setInlineEditing(false)
+      return
+    }
+    if (onRenameSubmit) {
+      setInlineSubmitting(true)
+      try {
+        const ok = await onRenameSubmit(item, trimmed)
+        if (ok) setInlineEditing(false)
+      } finally {
+        setInlineSubmitting(false)
+      }
+    } else {
+      onRename(item)
+      setInlineEditing(false)
+    }
+  }
+
+  const handleInlineCancel = () => {
+    setInlineEditing(false)
+    setInlineValue('')
+  }
 
   useEffect(() => {
+    if (checkedRef.current) return
     if (item.original_path && window.electronAPI) {
+      checkedRef.current = true
       window.electronAPI.checkFileExists(item.original_path).then(exists => {
         setOriginalMissing(!exists)
       })
-    } else {
+    } else if (!item.original_path) {
       setOriginalMissing(false)
     }
-  }, [item.original_path, refreshKey])
-
-  useEffect(() => { loadCollections() }, [])
+  }, [item.original_path])
 
   const handleRelocate = async () => {
     if (!window.electronAPI || !item.file_hash) return
@@ -204,15 +238,20 @@ export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditT
   const handleAddToCollection = async (collectionId: number) => {
     await addItemsToCollection(collectionId, [item.id])
     useAppStore.getState().bumpCollectionRefresh()
-    loadCollections()
+    useAppStore.getState().loadCollections()
   }
 
 
   const handleDragStart = (e: React.DragEvent) => {
     const state = useAppStore.getState()
-    const ids = state.selectedIds.has(item.id) && state.selectedIds.size > 1
-      ? Array.from(state.selectedIds)
-      : [item.id]
+    const isSelected = state.selectedIds.has(item.id)
+    let ids: string[]
+    if (isSelected && state.selectedIds.size > 1) {
+      ids = state.items.filter(i => state.selectedIds.has(i.id)).map(i => i.id)
+    } else {
+      ids = [item.id]
+    }
+    state.setDraggedItemIds(ids)
     e.dataTransfer.setData('application/x-item-ids', JSON.stringify(ids))
     e.dataTransfer.effectAllowed = 'move'
   }
@@ -282,24 +321,67 @@ export default function ItemCard({ item, onClick, onDelete, onReprocess, onEditT
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <Text strong ellipsis style={{ maxWidth: '100%', textAlign: 'center', fontSize: 13, color: 'var(--text)' }}>
-            {item.title || item.original_name}
-          </Text>
+          {inlineEditing ? (
+            <Input
+              size="small"
+              value={inlineValue}
+              onChange={e => setInlineValue(e.target.value)}
+              onPressEnter={handleInlineSubmit}
+              onBlur={() => setTimeout(() => { if (inlineEditing) setInlineEditing(false) }, 150)}
+              onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); handleInlineCancel() } }}
+              disabled={inlineSubmitting}
+              autoFocus
+              style={{ width: '90%', textAlign: 'center' }}
+              onClick={e => e.stopPropagation()}
+            />
+          ) : (
+            <Text
+              strong
+              ellipsis
+              style={{ maxWidth: '100%', textAlign: 'center', fontSize: 13, color: 'var(--text)', cursor: 'default' }}
+              onDoubleClick={handleInlineStart}
+              title={`双击重命名\n${item.original_path || item.file_path}`}
+            >
+              {item.title || item.original_name}
+            </Text>
+          )}
           <Space size={4} wrap style={{ justifyContent: 'center' }}>
             <Tag style={{ fontSize: 11, margin: 0 }}>{item.file_type.toUpperCase()}</Tag>
             <Text type="secondary" style={{ fontSize: 11 }}>{formatSize(item.file_size)}</Text>
           </Space>
+          {(item.collections && item.collections.length > 0) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2 }}>
+              {item.collections.map(c => (
+                <span key={c.id} style={{
+                  fontSize: 10, lineHeight: '18px', padding: '0 6px',
+                  borderRadius: 3, background: '#fafafa',
+                  color: 'var(--text-secondary)',
+                  borderLeft: `3px solid ${c.color}`,
+                  borderTop: '1px solid var(--border)',
+                  borderRight: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--border)',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 500
+                }}>
+                  <FolderOpenOutlined style={{ fontSize: 10, marginRight: 3, color: c.color }} />
+                  {c.name}
+                </span>
+              ))}
+            </div>
+          )}
           {item.tags && item.tags.length > 0 && (
             <Space size={2} wrap style={{ justifyContent: 'center' }}>
               {item.tags.map(t => (
-                <Tag key={t.id} color={t.color} style={{ fontSize: 10, margin: 0, lineHeight: '16px' }}>{t.name}</Tag>
+                <Tag key={t.id} color={t.color} style={{ fontSize: 10, margin: 0, lineHeight: '16px', borderRadius: 10 }}>{t.name}{t.is_ai_generated ? ' ·AI' : ''}</Tag>
               ))}
             </Space>
           )}
         </div>
       </Card>
     </Dropdown>
-    <CollectionManager open={collOpen} onClose={() => { setCollOpen(false); loadCollections() }} onSelectCollection={(c) => { handleAddToCollection(c.id); setCollOpen(false) }} />
+    <CollectionManager open={collOpen} onClose={() => { setCollOpen(false); useAppStore.getState().loadCollections() }} onSelectCollection={(c) => { handleAddToCollection(c.id); setCollOpen(false) }} />
     </div>
   )
-}
+})
+
+export default ItemCard

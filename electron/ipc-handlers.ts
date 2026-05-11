@@ -150,6 +150,10 @@ export function registerIpcHandlers(
     return fileManager.moveFile(relativePath, originalPath, destDir)
   })
 
+  ipcMain.handle('delete-file', (_event, relativePath: string, originalPath?: string | null) => {
+    fileManager.deleteFile(relativePath, originalPath)
+  })
+
   ipcMain.handle('find-file-by-hash', async (_event, fileHash: string, searchDir: string) => {
     return fileManager.findFileByHash(fileHash, searchDir)
   })

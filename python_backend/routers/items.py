@@ -42,8 +42,14 @@ def create_item(body: ItemCreate):
             "INSERT INTO processing_jobs (item_id, task_type, priority) VALUES (?, 'thumbnail', 5)",
             [item_id]
         )
+        db.execute(
+            "INSERT INTO processing_jobs (item_id, task_type, priority) VALUES (?, 'ai_classify', 3)",
+            [item_id]
+        )
     return {"id": item_id, "title": body.title, "status": "pending"}
 
+
+SORT_WHITELIST = {"created_at", "title", "file_size", "file_type", "original_name"}
 
 @router.get("")
 def list_items(
@@ -52,6 +58,8 @@ def list_items(
     tag_id: int | None = Query(None),
     collection_id: int | None = Query(None),
     q: str | None = Query(None),
+    sort_by: str = Query("created_at"),
+    sort_order: str = Query("desc"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200)
 ):
@@ -78,6 +86,9 @@ def list_items(
             conditions.append("i.title LIKE ?")
             params.append(f"%{q}%")
 
+        safe_sort = sort_by if sort_by in SORT_WHITELIST else "created_at"
+        safe_order = "DESC" if sort_order.lower() == "desc" else "ASC"
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         join_clause = " ".join(joins)
 
@@ -89,7 +100,7 @@ def list_items(
                        i.created_at, i.updated_at
                 FROM items i {join_clause}
                 WHERE {where_clause}
-                ORDER BY i.created_at DESC
+                ORDER BY i.{safe_sort} {safe_order}
                 LIMIT ? OFFSET ?""",
             params + [limit, offset]
         ).fetchall()
@@ -103,12 +114,41 @@ def list_items(
         for row in rows:
             items.append(dict(row))
 
-        for item in items:
+        # Batch-fetch tags for all items (avoid N+1 queries)
+        if items:
+            item_ids = [item['id'] for item in items]
+            placeholders = ','.join(['?' for _ in item_ids])
             tag_rows = db.execute(
-                "SELECT t.* FROM tags t JOIN item_tags it ON t.id = it.tag_id WHERE it.item_id = ?",
-                [item['id']]
+                f"""SELECT it.item_id, t.id, t.name, t.color, t.is_ai_generated
+                    FROM tags t
+                    JOIN item_tags it ON t.id = it.tag_id
+                    WHERE it.item_id IN ({placeholders})""",
+                item_ids
             ).fetchall()
-            item['tags'] = [dict(t) for t in tag_rows]
+            tag_map: dict[str, list] = {}
+            for tr in tag_rows:
+                tag_map.setdefault(tr['item_id'], []).append({
+                    'id': tr['id'], 'name': tr['name'],
+                    'color': tr['color'], 'is_ai_generated': bool(tr['is_ai_generated'])
+                })
+
+            # Batch-fetch collections for all items
+            coll_rows = db.execute(
+                f"""SELECT ci.item_id, c.id, c.name, c.color
+                    FROM collections c
+                    JOIN collection_items ci ON c.id = ci.collection_id
+                    WHERE ci.item_id IN ({placeholders})""",
+                item_ids
+            ).fetchall()
+            coll_map: dict[str, list] = {}
+            for cr in coll_rows:
+                coll_map.setdefault(cr['item_id'], []).append({
+                    'id': cr['id'], 'name': cr['name'], 'color': cr['color']
+                })
+
+            for item in items:
+                item['tags'] = tag_map.get(item['id'], [])
+                item['collections'] = coll_map.get(item['id'], [])
 
         return {"items": items, "total": total}
 
@@ -194,6 +234,10 @@ def reprocess_item(item_id: str):
         )
         db.execute(
             "INSERT INTO processing_jobs (item_id, task_type, priority) VALUES (?, 'thumbnail', 5)",
+            [item_id]
+        )
+        db.execute(
+            "INSERT INTO processing_jobs (item_id, task_type, priority) VALUES (?, 'ai_classify', 3)",
             [item_id]
         )
     return {"ok": True}

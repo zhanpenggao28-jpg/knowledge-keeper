@@ -1,6 +1,7 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
   selectFiles: () => ipcRenderer.invoke('select-files'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   importFiles: (options: { filePaths: string[]; targetDir?: string; prefix?: string; suffix?: string }) =>
@@ -28,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('relocate-file', itemId, originalPath),
   moveFile: (relativePath: string, originalPath: string | null, destDir: string) =>
     ipcRenderer.invoke('move-file', relativePath, originalPath, destDir),
+  deleteFile: (relativePath: string, originalPath?: string | null) =>
+    ipcRenderer.invoke('delete-file', relativePath, originalPath),
   syncFileNames: () => ipcRenderer.invoke('sync-file-names'),
 
   onSidecarReady: (callback: (port: number) => void) => {
@@ -39,5 +42,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: any, progress: any) => callback(progress)
     ipcRenderer.on('import-progress', handler)
     return () => ipcRenderer.removeListener('import-progress', handler)
+  },
+  onDropImportComplete: (callback: (result: { count: number; error?: string }) => void) => {
+    const handler = (_event: any, result: any) => callback(result)
+    ipcRenderer.on('drop-import-complete', handler)
+    return () => ipcRenderer.removeListener('drop-import-complete', handler)
   }
 })

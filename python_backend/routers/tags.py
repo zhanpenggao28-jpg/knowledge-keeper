@@ -56,6 +56,23 @@ def update_tag(tag_id: int, body: TagUpdate):
     return {"ok": True}
 
 
+@router.post("/{tag_id}/items")
+def add_items_to_tag(tag_id: int, body: dict):
+    """Batch-add a tag to multiple items."""
+    item_ids = body.get('item_ids', [])
+    if not item_ids:
+        raise HTTPException(status_code=400, detail="未指定文件")
+    with get_db() as db:
+        existing = db.execute("SELECT * FROM tags WHERE id = ?", [tag_id]).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="标签不存在")
+        count = 0
+        for item_id in item_ids:
+            db.execute("INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?, ?)", [item_id, tag_id])
+            count += 1
+        db.commit()
+    return {"added": count, "tag_name": existing['name']}
+
 @router.delete("/{tag_id}")
 def delete_tag(tag_id: int):
     with get_db() as db:

@@ -4,13 +4,15 @@ import {
   HomeOutlined,
   FolderOpenOutlined,
   SettingOutlined,
-  PlusOutlined
+  PlusOutlined,
+  TagsOutlined
 } from '@ant-design/icons'
 import { useTags } from '../../hooks/useTags'
 import { useAppStore } from '../../stores/appStore'
-import { addItemsToCollection } from '../../services/api'
+import { addItemsToCollection, addItemsToTag } from '../../services/api'
 import { useState, useEffect } from 'react'
 import CollectionManager from '../library/CollectionManager'
+import TagManager from '../tags/TagManager'
 
 export default function Sidebar() {
   const navigate = useNavigate()
@@ -23,7 +25,9 @@ export default function Sidebar() {
   } = useAppStore()
   const { message } = App.useApp()
   const [collectionOpen, setCollectionOpen] = useState(false)
+  const [tagOpen, setTagOpen] = useState(false)
   const [dragOverId, setDragOverId] = useState<number | null>(null)
+  const [tagDragOverId, setTagDragOverId] = useState<number | null>(null)
 
   useEffect(() => {
     loadCollections()
@@ -79,8 +83,7 @@ export default function Sidebar() {
         selectedKeys={getSelectedKeys()}
         items={menuItems}
         onClick={({ key }) => {
-          setTagFilter(null)
-          setCollectionFilter(null)
+          setCollectionFilter(null) // clears both activeCollectionId and activeTagId, calls loadItems once
           navigate(key)
         }}
         style={{ borderRight: 0, flexShrink: 0 }}
@@ -90,10 +93,15 @@ export default function Sidebar() {
         flex: 1,
         overflow: 'auto',
         padding: '0 12px',
-        borderTop: (collections.length > 0 || tags.length > 0) ? '1px solid var(--border)' : 'none'
+        borderTop: '1px solid var(--border)'
       }}>
         {/* Collections section */}
         {sectionLabel('收藏集', () => setCollectionOpen(true))}
+        {collections.length === 0 && (
+          <div style={{ padding: '6px 12px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            暂无收藏集，点击 + 创建
+          </div>
+        )}
         {collections.map(col => {
           const active = activeCollectionId === col.id
           const isDragOver = dragOverId === col.id
@@ -115,7 +123,8 @@ export default function Sidebar() {
                 setDragOverId(null)
                 try {
                   const raw = e.dataTransfer.getData('application/x-item-ids')
-                  const ids: string[] = raw ? JSON.parse(raw) : []
+                  const storeIds = useAppStore.getState().draggedItemIds
+                  const ids: string[] = raw ? JSON.parse(raw) : storeIds
                   if (ids.length > 0) {
                     await addItemsToCollection(col.id, ids)
                     message.success(`已添加 ${ids.length} 个文件到「${col.name}」`)
@@ -167,61 +176,96 @@ export default function Sidebar() {
           )
         })}
 
-        {/* Tags section */}
-        {tags.length > 0 && (
-          <>
-            {sectionLabel('标签')}
-            {tags.map(tag => {
-              const active = activeTagId === tag.id
-              return (
-                <div
-                  key={tag.id}
-                  onClick={() => {
-                    setTagFilter(active ? null : tag.id)
-                    navigate('/library')
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 12px',
-                    marginBottom: 2,
-                    borderRadius: 'var(--radius-sm)',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    color: active ? tag.color : 'var(--text-secondary)',
-                    background: active ? `${tag.color}14` : 'transparent',
-                    transition: 'all 0.15s',
-                    userSelect: 'none'
-                  }}
-                  onMouseEnter={e => {
-                    if (!active) e.currentTarget.style.background = 'var(--bg-hover)'
-                  }}
-                  onMouseLeave={e => {
-                    if (!active) e.currentTarget.style.background = 'transparent'
-                  }}
-                >
-                  <span style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: tag.color,
-                    flexShrink: 0
-                  }} />
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {tag.name}
-                  </span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
-                    {tag.item_count ?? 0}
-                  </span>
-                </div>
-              )
-            })}
-          </>
+        {/* Tags section — always visible */}
+        {sectionLabel('标签', () => setTagOpen(true))}
+        {tags.length === 0 && (
+          <div style={{
+            padding: '8px 12px',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            fontStyle: 'italic',
+            textAlign: 'center',
+            border: '1px dashed var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            margin: '4px 0'
+          }}>
+            <TagsOutlined style={{ marginRight: 6 }} />
+            暂无标签，点击 + 创建
+          </div>
         )}
+        {tags.map(tag => {
+          const active = activeTagId === tag.id
+          const isTagDragOver = tagDragOverId === tag.id
+          return (
+            <div
+              key={tag.id}
+              onClick={() => {
+                setTagFilter(active ? null : tag.id)
+                navigate('/library')
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setTagDragOverId(tag.id)
+              }}
+              onDragLeave={() => setTagDragOverId(null)}
+              onDrop={async (e) => {
+                e.preventDefault()
+                setTagDragOverId(null)
+                try {
+                  const raw = e.dataTransfer.getData('application/x-item-ids')
+                  const storeIds = useAppStore.getState().draggedItemIds
+                  const ids: string[] = raw ? JSON.parse(raw) : storeIds
+                  if (ids.length > 0) {
+                    await addItemsToTag(tag.id, ids)
+                    message.success(`已添加 ${ids.length} 个文件到标签「${tag.name}」`)
+                    useAppStore.getState().loadItems()
+                  }
+                } catch { /* no data */ }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                marginBottom: 2,
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                fontSize: 13,
+                color: active ? tag.color : 'var(--text-secondary)',
+                background: isTagDragOver ? 'var(--accent-dim)' : active ? `${tag.color}14` : 'transparent',
+                outline: isTagDragOver ? '1px dashed var(--accent)' : 'none',
+                transition: 'all 0.15s',
+                userSelect: 'none'
+              }}
+              onMouseEnter={e => {
+                if (!active && !isTagDragOver) e.currentTarget.style.background = 'var(--bg-hover)'
+              }}
+              onMouseLeave={e => {
+                if (!active && !isTagDragOver) e.currentTarget.style.background = 'transparent'
+                setTagDragOverId(prev => prev === tag.id ? null : prev)
+              }}
+            >
+              <span style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: tag.color,
+                flexShrink: 0
+              }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tag.name}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                {tag.item_count ?? 0}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
       <CollectionManager open={collectionOpen} onClose={() => setCollectionOpen(false)} />
+      <TagManager open={tagOpen} onClose={() => setTagOpen(false)} />
     </div>
   )
 }

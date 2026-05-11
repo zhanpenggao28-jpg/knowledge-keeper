@@ -9,6 +9,54 @@ let mainWindow: BrowserWindow | null = null
 let sidecar: SidecarManager | null = null
 let fileManager: FileManager | null = null
 
+async function importDroppedFiles(filePaths: string[]) {
+  if (!fileManager || !sidecar || !mainWindow) return
+  const port = sidecar.getPort()
+  if (!port) return
+
+  try {
+    const files = await fileManager.importFiles({ filePaths })
+    if (files.length === 0) return
+
+    // Register each file with the backend
+    const results = []
+    for (const file of files) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: file.title,
+            originalName: file.originalName,
+            fileType: file.fileType,
+            category: file.category,
+            filePath: file.filePath,
+            fileSize: file.fileSize,
+            fileHash: file.fileHash,
+            originalPath: file.originalPath
+          })
+        })
+        const data = await response.json()
+        results.push(data)
+
+        mainWindow?.webContents.send('import-progress', {
+          current: results.length,
+          total: files.length,
+          item: data
+        })
+      } catch (err) {
+        console.error('Failed to register dropped file:', err)
+      }
+    }
+
+    // Notify renderer to refresh
+    mainWindow?.webContents.send('drop-import-complete', { count: results.length })
+  } catch (err) {
+    console.error('Drop import failed:', err)
+    mainWindow?.webContents.send('drop-import-complete', { count: 0, error: (err as Error).message })
+  }
+}
+
 const zhMenu = Menu.buildFromTemplate([
   {
     label: '文件',
@@ -69,6 +117,23 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  // Intercept file drops: when user drops a file from OS, Chromium tries to
+  // navigate to file:///path. We intercept this and import the file instead.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('file:///')) {
+      event.preventDefault()
+      const filePath = decodeURIComponent(url.replace('file:///', ''))
+      // Convert to Windows path format
+      const winPath = process.platform === 'win32' ? filePath.replace(/\//g, '\\') : filePath
+      importDroppedFiles([winPath])
+    }
+  })
+
+  // Also intercept dropped files via the 'open-file' event (macOS)
+  app.on('open-file', (_event, filePath) => {
+    importDroppedFiles([filePath])
+  })
 }
 
 app.whenReady().then(async () => {
@@ -92,9 +157,17 @@ app.whenReady().then(async () => {
 
   registerIpcHandlers(ipcMain, fileManager, sidecar)
 
-  await sidecar.start()
-
+  // Create window FIRST so user sees UI immediately
   createWindow()
+
+  // Start Python backend in background (don't block window creation)
+  sidecar.start().then(() => {
+    const port = sidecar.getPort()
+    console.log('[main] sidecar ready on port', port)
+    mainWindow?.webContents.send('sidecar-ready', port)
+  }).catch((err) => {
+    console.error('[main] sidecar failed to start:', err)
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

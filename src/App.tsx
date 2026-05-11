@@ -7,23 +7,32 @@ import LibraryPage from './pages/LibraryPage'
 import SettingsPage from './pages/SettingsPage'
 import { useSettingsStore } from './stores/settingsStore'
 import { setApiPort } from './services/api'
+import { useAppStore } from './stores/appStore'
 
 export default function App() {
   const { setSidecarPort, setSidecarStatus } = useSettingsStore()
 
+  // Global drop handler for file import — capture phase ensures we catch it
+  // before any child element can interfere
+  // Drag acceptance is handled by index.html inline script (dragover)
+  // and useDragImport hook (dragenter/dragleave/drop visual overlay).
+  // On drop, Chromium navigates to file:/// which main process intercepts via will-navigate.
+  // (Electron 33 removed File.path from renderer, so we rely on main-process interception)
+
   useEffect(() => {
     if (window.electronAPI) {
-      const unsubscribe = window.electronAPI.onSidecarReady((port: number) => {
+      const onReady = (port: number) => {
         setSidecarPort(port)
         setSidecarStatus('running')
         setApiPort(port)
-      })
+        useAppStore.getState().bumpTagRefresh()
+        useAppStore.getState().bumpCollectionRefresh()
+      }
+      const unsubscribe = window.electronAPI.onSidecarReady(onReady)
 
       window.electronAPI.getSidecarPort().then((port) => {
         if (port) {
-          setSidecarPort(port)
-          setSidecarStatus('running')
-          setApiPort(port)
+          onReady(port)
         }
       })
 
@@ -31,8 +40,14 @@ export default function App() {
         setSidecarStatus(status)
       })
 
+      // Refresh items when main-process drop import completes
+      const unsubDrop = window.electronAPI.onDropImportComplete(() => {
+        useAppStore.getState().loadItems()
+      })
+
       return () => {
         unsubscribe()
+        unsubDrop()
       }
     }
   }, [])

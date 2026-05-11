@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Button, Space, Typography, App } from 'antd'
-import { DeleteOutlined, ExportOutlined, CloseOutlined, SelectOutlined, TagsOutlined, FolderOpenOutlined, PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined, ExportOutlined, CloseOutlined, SelectOutlined, TagsOutlined, FolderOpenOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons'
 import { useAppStore } from '../../stores/appStore'
 import { deleteItem, updateItem, addItemsToCollection } from '../../services/api'
 import TagManager from '../tags/TagManager'
 import CollectionManager from './CollectionManager'
+import BatchRenameDialog from './BatchRenameDialog'
 
 const { Text } = Typography
 
@@ -13,10 +14,17 @@ interface Props {
 }
 
 export default function BatchToolbar({ onRefresh }: Props) {
-  const { selectedIds, clearSelection, selectAll, items, collections, loadCollections, bumpCollectionRefresh } = useAppStore()
+  const selectedIds = useAppStore(s => s.selectedIds)
+  const clearSelection = useAppStore(s => s.clearSelection)
+  const selectAll = useAppStore(s => s.selectAll)
+  const items = useAppStore(s => s.items)
+  const collections = useAppStore(s => s.collections)
+  const loadCollections = useAppStore(s => s.loadCollections)
+  const bumpCollectionRefresh = useAppStore(s => s.bumpCollectionRefresh)
   const { message, modal } = App.useApp()
   const [tagOpen, setTagOpen] = useState(false)
   const [collOpen, setCollOpen] = useState(false)
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
 
   const count = selectedIds.size
   if (count === 0) return null
@@ -141,6 +149,9 @@ export default function BatchToolbar({ onRefresh }: Props) {
           <Button size="small" icon={<PlusOutlined />} onClick={() => { loadCollections(); setCollOpen(true) }}>
             收藏集
           </Button>
+          <Button size="small" icon={<EditOutlined />} onClick={() => setRenameDialogOpen(true)}>
+            重命名
+          </Button>
           <Button size="small" icon={<FolderOpenOutlined />} onClick={handleMove}>
             移动到
           </Button>
@@ -180,6 +191,12 @@ export default function BatchToolbar({ onRefresh }: Props) {
         open={collOpen}
         onClose={() => setCollOpen(false)}
         onSelectCollection={(c) => { handleAddToCollection(c.id); setCollOpen(false) }}
+      />
+      <BatchRenameDialog
+        open={renameDialogOpen}
+        selectedItems={selectedItems}
+        onClose={() => setRenameDialogOpen(false)}
+        onComplete={() => { setRenameDialogOpen(false); onRefresh() }}
       />
     </>
   )

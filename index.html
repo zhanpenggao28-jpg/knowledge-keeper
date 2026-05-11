@@ -7,6 +7,36 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Accept file drops and import via getFilePath (replaces removed File.path in Electron 33+)
+      document.addEventListener('dragover', function(e) {
+        e.preventDefault()
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      }, true)
+
+      document.addEventListener('drop', function(e) {
+        var files = e.dataTransfer && e.dataTransfer.files
+        if (!files || !files.length) return
+        var paths = []
+        for (var i = 0; i < files.length; i++) {
+          if (window.electronAPI && window.electronAPI.getFilePath) {
+            var p = window.electronAPI.getFilePath(files[i])
+            if (p) paths.push(p)
+          }
+        }
+        if (paths.length > 0) {
+          // Only prevent default when we can actually import via IPC
+          e.preventDefault()
+          window.electronAPI.importFiles({ filePaths: paths }).then(function(results) {
+            window.postMessage({ type: 'native-drop-ok', count: Array.isArray(results) ? results.length : paths.length }, '*')
+          }).catch(function(err) {
+            window.postMessage({ type: 'native-drop-ok', error: err.message }, '*')
+          })
+        }
+        // If getFilePath returned nothing, let default behavior happen:
+        // Chromium navigates to file:/// → main process intercepts via will-navigate
+      }, true)
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

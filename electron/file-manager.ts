@@ -70,11 +70,18 @@ export class FileManager {
       fs.mkdirSync(targetDir, { recursive: true })
     }
 
+    // Process in parallel batches for speed (max 4 concurrent)
+    const CONCURRENCY = 4
     const imported: ImportedFile[] = []
 
-    for (const sourcePath of filePaths) {
-      const file = await this.importSingleFile(sourcePath, { targetDir, prefix, suffix })
-      if (file) imported.push(file)
+    for (let i = 0; i < filePaths.length; i += CONCURRENCY) {
+      const batch = filePaths.slice(i, i + CONCURRENCY)
+      const batchResults = await Promise.all(
+        batch.map(sourcePath => this.importSingleFile(sourcePath, { targetDir, prefix, suffix }))
+      )
+      for (const f of batchResults) {
+        if (f) imported.push(f)
+      }
     }
 
     return imported
@@ -90,8 +97,14 @@ export class FileManager {
       const originalName = path.basename(sourcePath)
       const baseName = path.basename(sourcePath, path.extname(sourcePath))
 
-      const fileBuffer = fs.readFileSync(sourcePath)
-      const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+      // Streaming hash — avoids loading entire file into memory
+      const hash = await new Promise<string>((resolve, reject) => {
+        const h = crypto.createHash('sha256')
+        const stream = fs.createReadStream(sourcePath, { highWaterMark: 64 * 1024 })
+        stream.on('data', chunk => h.update(chunk))
+        stream.on('end', () => resolve(h.digest('hex')))
+        stream.on('error', reject)
+      })
       const hashDir = hash.substring(0, 16)
 
       // Copy to internal storage
@@ -102,7 +115,7 @@ export class FileManager {
       const targetPath = path.join(targetDir, `original${targetExt}`)
       fs.copyFileSync(sourcePath, targetPath)
 
-      // Optionally organize to custom directory (move: copy then delete source)
+      // Optionally organize to custom directory
       let originalPath: string | null = sourcePath
       if (organize?.targetDir) {
         const pfx = organize.prefix || ''
@@ -250,6 +263,13 @@ export class FileManager {
       fs.unlinkSync(sourcePath)
       return { success: true, newPath: destPath, destName: path.basename(destPath) }
     } catch { return { success: false } }
+  }
+
+  deleteFile(relativePath: string, originalPath?: string | null): void {
+    const absPath = this.resolveWorkingPath(originalPath, relativePath)
+    if (fs.existsSync(absPath)) {
+      fs.unlinkSync(absPath)
+    }
   }
 
   findFileByHash(fileHash: string, searchDir: string): string | null {

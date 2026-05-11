@@ -52,10 +52,17 @@ export async function getItems(params?: {
   tag_id?: number
   collection_id?: number
   q?: string
+  sort_by?: string
+  sort_order?: string
   offset?: number
   limit?: number
 }): Promise<{ items: Item[]; total: number }> {
   const { data } = await api.get('/items', { params })
+  return data
+}
+
+export async function getDuplicates(): Promise<{ groups: { hash: string; count: number; items: Item[] }[] }> {
+  const { data } = await api.get('/duplicates')
   return data
 }
 
@@ -83,8 +90,23 @@ export async function addItemsToCollection(collectionId: number, itemIds: string
   await api.post(`/collections/${collectionId}/items`, { item_ids: itemIds })
 }
 
+export async function addItemsToTag(tagId: number, itemIds: string[]): Promise<void> {
+  await api.post(`/tags/${tagId}/items`, { item_ids: itemIds })
+}
+
 export async function removeItemsFromCollection(collectionId: number, itemIds: string[]): Promise<void> {
   await api.delete(`/collections/${collectionId}/items`, { data: { item_ids: itemIds } })
+}
+
+// --- Chat ---
+
+export async function sendChatMessage(
+  message: string,
+  history?: { role: string; text: string; action?: string; result?: any }[],
+  selectedIds?: string[]
+): Promise<{ message: string; action: string; result: any; results?: { action: string; result: any }[] }> {
+  const { data } = await api.post('/chat', { message, history: history || [], selected_ids: selectedIds || [] })
+  return data
 }
 
 export async function getItem(id: string): Promise<Item> {
